@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: credit_risk_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: credit_risk
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d credit_risk"]
+      interval: 5s
+      retries: 5
+  app:
+    build: .
+    container_name: credit_risk_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: python src/connection.py
+
+volumes:
+  postgres_data:

@@ -1,0 +1,26 @@
+-- auto generated raw_loans table with zero entries, to be populated by the data pipeline
+CREATE TABLE IF NOT EXISTS raw_loans (
+    id                      TEXT,
+    loan_amnt               NUMERIC,
+    funded_amnt             NUMERIC,
+    term                    TEXT,
+    int_rate                TEXT,
+    installment             NUMERIC,
+    grade                   TEXT,
+    sub_grade               TEXT,
+    emp_length              TEXT,
+    home_ownership          TEXT,
+    annual_inc              NUMERIC,
+    loan_status             TEXT,
+    purpose                 TEXT,
+    dti                     NUMERIC,
+    delinq_2yrs             NUMERIC,
+    earliest_cr_line        TEXT,
+    fico_range_low          NUMERIC,
+    fico_range_high         NUMERIC,
+    open_acc                NUMERIC,
+    revol_bal               NUMERIC,
+    revol_util              TEXT,   
+    total_acc               NUMERIC,
+    issue_d                 TEXT
+);
