@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN pip install psycopg2-binary sqlalchemy pandas
+RUN pip install psycopg2-binary sqlalchemy pandas kaggle
 
 COPY src ./src
 COPY sql ./sql

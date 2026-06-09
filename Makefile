@@ -4,6 +4,9 @@ start:
 up:
 	docker compose up -d
 
+download-data:
+	docker compose run --rm --build app python src/download_kaggle.py
+
 down:
 	docker compose down
 
