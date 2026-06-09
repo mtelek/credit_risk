@@ -217,8 +217,5 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-#GUIDE
-guide.txt
-
 #RAW DATA
 /data/raw/

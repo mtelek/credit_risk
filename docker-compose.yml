@@ -2,10 +2,6 @@ services:
   postgres:
     image: postgres:16
     container_name: credit_risk_db
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: credit_risk
     ports:
       - "5432:5432"
     env_file:
@@ -29,5 +25,18 @@ services:
         condition: service_healthy
     command: python src/connection.py
 
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    env_file:
+      - .env
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
 volumes:
   postgres_data:
+  pgadmin_data:

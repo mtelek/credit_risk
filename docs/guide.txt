@@ -1,0 +1,81 @@
+================================================================
+                  PRACTICAL PROJECT OUTLINE
+================================================================
+
+---------------------------------------------------------------------
+❌Phase 1: Setup
+---------------------------------------------------------------------
+
+✅ Install PostgreSQL locally and set up a database called credit_risk
+✅Download the Lending Club dataset from Kaggle (search "Lending Club Loan Data")
+❌Explore the raw CSV — it has ~150 columns, understand what each key column means
+❌Load the data into PostgreSQL using Python (psycopg2 or SQLAlchemy + pandas)
+❌Define target variable: loan_status — map "Charged Off" / "Default" to 1, "Fully Paid" to 0, drop everything else (current loans, grace period etc.)
+
+---------------------------------------------------------------------
+❌Phase 2: SQL Cleaning & Feature Engineering
+---------------------------------------------------------------------
+
+Write SQL queries to:
+❌Drop columns with excessive missing values (>40% null)
+❌Clean text columns — emp_length is stored as "10+ years", convert to numeric
+❌Compute derived features:
+
+debt_to_income ratio
+credit_utilization (revolving balance / revolving limit)
+months_since_earliest_credit_line
+
+❌Segment and explore default rates by loan grade, purpose, home ownership
+❌Create a clean final table model_ready that the Python code will read from
+
+---------------------------------------------------------------------
+Phase 3: Python Modeling
+---------------------------------------------------------------------
+
+❌Pull model_ready table into pandas via SQLAlchemy
+❌Train/test split — split chronologically by issue date, not randomly. Earlier loans train, later loans test.
+❌WoE encoding — encode categorical variables using Weight of Evidence (use the scorecardpy library)
+
+❌Logistic Regression first:
+❌Fit with sklearn
+❌Check coefficients make business sense (higher debt-to-income → higher default probability?)
+❌Evaluate: ROC-AUC, Gini, KS statistic
+
+❌XGBoost second:
+❌Fit, tune hyperparameters with cross-validation
+❌Compare performance vs logistic regression
+❌Plot feature importance
+
+---------------------------------------------------------------------
+Phase 4: Scorecard & Evaluation
+---------------------------------------------------------------------
+
+❌Convert logistic regression into an actual scorecard using the scorecardpy library — this produces a points table like a real bank scorecard
+❌Plot the ROC curve comparing logistic regression vs XGBoost
+❌Compute and plot the KS statistic chart (shows separation between default and non-default score distributions)
+❌Calibration plot — does the model's predicted probability match actual default rates?
+❌Write a short interpretation: what are the top 5 most predictive features and why does that make business sense?
+
+---------------------------------------------------------------------
+❌Phase 5: Cleanup & Documentation
+---------------------------------------------------------------------
+
+❌Structure repo cleanly:
+credit-risk-scorecard/
+├── data/           # instructions to download, not the actual data
+├── sql/            # all .sql scripts
+├── notebooks/      # exploratory analysis
+├── src/            # clean Python scripts
+├── outputs/        # charts, scorecard table
+└── README.md
+❌Write a strong README that explains: the problem, approach, key findings, model performance, and how to run it
+
+Libraries You'll Use
+LibraryPurposepsycopg2 / SQLAlchemyConnect Python to PostgreSQLpandasData manipulationsklearnLogistic regression, metrics, cross-validationxgboostGradient boosting modelscorecardpyWoE encoding, scorecard conversionimbalanced-learnSMOTE for class imbalancematplotlib / seabornVisualization
+
+Learning Resources
+
+Theory: "Credit Risk Scorecards" by Naeem Siddiqi — the industry standard book, worth at least skimming
+WoE/IV: search "Weight of Evidence credit risk" — lots of good blog posts
+XGBoost: the official docs are actually very readable
+SQL window functions: Mode Analytics SQL tutorial is excellent and free
