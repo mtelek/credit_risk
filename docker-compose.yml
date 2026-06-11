@@ -23,7 +23,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: python src/connection.py
+    command: sh -c "python src/connection.py && python src/project.py"
 
   pgadmin:
     image: dpage/pgadmin4

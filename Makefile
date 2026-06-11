@@ -1,14 +1,16 @@
+COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
+
 start:
-	docker compose up --build -d
+	$(COMPOSE) up --build
 
 up:
-	docker compose up -d
+	$(COMPOSE) up
 
 download-data:
-	docker compose run --rm --build app python src/download_kaggle.py
+	$(COMPOSE) run --rm --build app python src/download_kaggle.py
 
 down:
-	docker compose down
+	$(COMPOSE) down
 
 clean:
-	docker compose down -v
+	$(COMPOSE) down -v

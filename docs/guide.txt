@@ -8,7 +8,7 @@
 
 ✅ Install PostgreSQL locally and set up a database called credit_risk
 ✅Download the Lending Club dataset from Kaggle (search "Lending Club Loan Data")
-❌Explore the raw CSV — it has ~150 columns, understand what each key column means
+✅Explore the raw CSV — it has ~150 columns, understand what each key column means
 ❌Load the data into PostgreSQL using Python (psycopg2 or SQLAlchemy + pandas)
 ❌Define target variable: loan_status — map "Charged Off" / "Default" to 1, "Fully Paid" to 0, drop everything else (current loans, grace period etc.)
 
@@ -54,7 +54,7 @@ Phase 4: Scorecard & Evaluation
 ❌Plot the ROC curve comparing logistic regression vs XGBoost
 ❌Compute and plot the KS statistic chart (shows separation between default and non-default score distributions)
 ❌Calibration plot — does the model's predicted probability match actual default rates?
-❌Write a short interpretation: what are the top 5 most predictive features and why does that make business sense?
+❌Write a short interpretation: what are the top 5 most predictive features and why does that make business sense?  
 
 ---------------------------------------------------------------------
 ❌Phase 5: Cleanup & Documentation
