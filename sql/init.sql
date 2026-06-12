@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS accepted_loans (
     dti                     TEXT,
     fico_range_low          TEXT,
     fico_range_high         TEXT,
-    deling_2yrs             TEXT,
+    delinq_2yrs             TEXT,
     inq_last_6mths          TEXT,
     open_acc                TEXT,
     pub_rec                 TEXT,
@@ -31,3 +31,18 @@ CREATE TABLE IF NOT EXISTS accepted_loans (
     tax_liens               TEXT,
     earliest_cr_line        TEXT
 );
+
+/*Populate accepted_loans from staging table. In a real pipeline, this would be done in batches with transformations and error handling, but for simplicity we are doing it in one step here.*/
+INSERT INTO accepted_loans (
+loan_status, issue_d, id, loan_amnt, term, int_rate, installment, grade, sub_grade,
+emp_length, home_ownership, annual_inc, verification_status, purpose, addr_state, dti,
+fico_range_low, fico_range_high, delinq_2yrs, inq_last_6mths, open_acc, pub_rec,
+revol_bal, total_rev_hi_lim, revol_util, total_acc, mort_acc, pub_ec_bankruptcies,
+tax_liens, earliest_cr_line
+)
+SELECT loan_status, issue_d, id, loan_amnt, term, int_rate, installment, grade, sub_grade,
+emp_length, home_ownership, annual_inc, verification_status, purpose, addr_state, dti,
+fico_range_low, fico_range_high, delinq_2yrs, inq_last_6mths, open_acc, pub_rec,
+revol_bal, total_rev_hi_lim, revol_util, total_acc, mort_acc, pub_rec_bankruptcies,
+tax_liens, earliest_cr_line FROM stg_accepted_loans;
+

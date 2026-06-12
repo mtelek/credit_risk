@@ -8,7 +8,6 @@ services:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d credit_risk"]
       interval: 5s
@@ -23,7 +22,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "python src/connection.py && python src/project.py"
+    command: "python src/project.py"
+
+  db-init:
+    image: postgres:16
+    container_name: credit_risk_db_init
+    env_file:
+      - .env
+    volumes:
+      - ./sql:/sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app:
+        condition: service_completed_successfully
+    command: >
+      sh -c "PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -f /sql/init.sql"
+    restart: "no"
 
   pgadmin:
     image: dpage/pgadmin4

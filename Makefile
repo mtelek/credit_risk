@@ -14,4 +14,14 @@ down:
 
 clean:
 	$(COMPOSE) down -v
-	rm -fr data/
+
+clean-data:
+	$(COMPOSE) down -v
+	sudo rm -fr data/
+
+prune-all:
+	$(COMPOSE) down -v --rmi all --remove-orphans
+	docker system prune -a --volumes -f
+
+prune:
+	docker system prune -a --volumes -f

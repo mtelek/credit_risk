@@ -2,6 +2,52 @@ import csv
 import re
 from pathlib import Path
 
+SQL_RESERVED_WORDS = {
+	"all",
+	"analyze",
+	"and",
+	"as",
+	"asc",
+	"between",
+	"by",
+	"case",
+	"check",
+	"column",
+	"constraint",
+	"create",
+	"desc",
+	"distinct",
+	"else",
+	"end",
+	"exists",
+	"false",
+	"for",
+	"from",
+	"group",
+	"having",
+	"in",
+	"insert",
+	"into",
+	"is",
+	"join",
+	"like",
+	"limit",
+	"not",
+	"null",
+	"on",
+	"or",
+	"order",
+	"select",
+	"table",
+	"then",
+	"true",
+	"union",
+	"update",
+	"values",
+	"where",
+	"with",
+}
+
 def read_column_names(csv_path):
 	path = Path(csv_path)
 	with path.open(newline="", encoding="utf-8") as f:
@@ -17,6 +63,8 @@ def _normalize_identifier(name):
 		normalized = "col"
 	if normalized[0].isdigit():
 		normalized = f"col_{normalized}"
+	if normalized in SQL_RESERVED_WORDS:
+		normalized = f"{normalized}_"
 	return normalized
 
 
