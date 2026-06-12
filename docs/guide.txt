@@ -9,7 +9,7 @@
 ✅ Install PostgreSQL locally and set up a database called credit_risk
 ✅Download the Lending Club dataset from Kaggle (search "Lending Club Loan Data")
 ✅Explore the raw CSV — it has ~150 columns, understand what each key column means
-❌Load the data into PostgreSQL using Python (psycopg2 or SQLAlchemy + pandas)
+✅Load the data into PostgreSQL using Python (psycopg2 or SQLAlchemy + pandas)
 ❌Define target variable: loan_status — map "Charged Off" / "Default" to 1, "Fully Paid" to 0, drop everything else (current loans, grace period etc.)
 
 ---------------------------------------------------------------------
@@ -17,8 +17,8 @@
 ---------------------------------------------------------------------
 
 Write SQL queries to:
-❌Drop columns with excessive missing values (>40% null)
-❌Clean text columns — emp_length is stored as "10+ years", convert to numeric
+✅Drop columns with excessive missing values (>70% null)
+✅Clean text columns — emp_length is stored as "10+ years", convert to numeric
 ❌Compute derived features:
 
 debt_to_income ratio
