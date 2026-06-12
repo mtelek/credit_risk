@@ -35,7 +35,7 @@ services:
       postgres:
         condition: service_healthy
       app:
-        condition: service_completed_successfully
+        condition: service_cojmpleted_successfully
     command: >
       sh -c "PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -f /sql/init.sql"
     restart: "no"
@@ -48,7 +48,12 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+      app:
+        condition: service_completed_successfully
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 

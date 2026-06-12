@@ -6,6 +6,27 @@ def main():
     table_name = "stg_accepted_loans"
     csv_path = "/app/data/raw/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv"
 
+    engine = create_engine("postgresql+psycopg2://admin:password@postgres:5432/credit_risk")
+    with engine.connect() as connection:
+        table_exists = connection.execute(
+            text(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = :table_name
+                )
+                """
+            ),
+            {"table_name": table_name},
+        ).scalar_one()
+
+    if table_exists:
+        with engine.connect() as connection:
+            row_count = connection.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar_one()
+        print(f"{table_name} already exists. Skipping create/load. Current rows: {row_count}")
+        return
+
     #Read CSV header into a Python list
     column_names = read_column_names(csv_path)
 
@@ -19,7 +40,6 @@ def main():
     #print(staging_sql)
 
     #create staging table in Postgres using SQLAlchemy
-    engine = create_engine("postgresql+psycopg2://admin:password@postgres:5432/credit_risk")
     with engine.begin() as connection:
         connection.execute(text(staging_sql))
         connection.execute(text(f"TRUNCATE TABLE {table_name}"))
