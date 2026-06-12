@@ -35,7 +35,7 @@ services:
       postgres:
         condition: service_healthy
       app:
-        condition: service_cojmpleted_successfully
+        condition: service_completed_successfully
     command: >
       sh -c "PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -f /sql/init.sql"
     restart: "no"
