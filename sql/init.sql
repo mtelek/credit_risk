@@ -29,5 +29,5 @@ CREATE TABLE IF NOT EXISTS accepted_loans (
     mort_acc                TEXT,
     pub_ec_bankruptcies     TEXT,
     tax_liens               TEXT,
-    earliest_cr_line        TEXT,
+    earliest_cr_line        TEXT
 );

@@ -14,3 +14,4 @@ down:
 
 clean:
 	$(COMPOSE) down -v
+	rm -fr data/
