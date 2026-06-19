@@ -62,7 +62,11 @@ BEGIN
       SELECT COUNT(*)
       FROM jsonb_object_keys(to_jsonb(a))
     ) >= 0.70;
+    /*Remove not meaningful loan_status status rows*/
+    DELETE FROM accepted_loans
+    WHERE lower(trim(loan_status)) NOT IN ('charged off', 'default', 'fully paid');
 
+  /*Change types from text to numeric*/
     ALTER TABLE accepted_loans
       ALTER COLUMN id TYPE NUMERIC USING NULLIF(TRIM(id), '')::NUMERIC,
       ALTER COLUMN loan_amnt TYPE NUMERIC USING NULLIF(TRIM(loan_amnt), '')::NUMERIC,
