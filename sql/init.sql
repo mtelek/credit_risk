@@ -66,6 +66,23 @@ BEGIN
     DELETE FROM accepted_loans
     WHERE lower(trim(loan_status)) NOT IN ('charged off', 'default', 'fully paid');
 
+    /*Set fully paid to 0, and charged off, defualt to 1*/
+    UPDATE accepted_loans
+    SET loan_status = CASE
+      WHEN lower(trim(loan_status)) = 'fully paid' THEN 0
+      WHEN lower(trim(loan_status)) IN ('charged off', 'default') THEN 1
+      ELSE NULL
+    END;
+
+    /*Delete left over NULL values in loan_status. if any*/
+    DELETE FROM accepted_loans
+    WHERE loan_status IS NULL;
+
+    /*set loan_status type to smallint*/
+    ALTER TABLE accepted_loans
+    ALTER COLUMN loan_status TYPE SMALLINT
+    USING loan_status::SMALLINT;
+
   /*Change types from text to numeric*/
     ALTER TABLE accepted_loans
       ALTER COLUMN id TYPE NUMERIC USING NULLIF(TRIM(id), '')::NUMERIC,
