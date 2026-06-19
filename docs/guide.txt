@@ -3,14 +3,14 @@
 ================================================================
 
 ---------------------------------------------------------------------
-❌Phase 1: Setup
+✅Phase 1: Setup
 ---------------------------------------------------------------------
 
 ✅ Install PostgreSQL locally and set up a database called credit_risk
 ✅Download the Lending Club dataset from Kaggle (search "Lending Club Loan Data")
 ✅Explore the raw CSV — it has ~150 columns, understand what each key column means
 ✅Load the data into PostgreSQL using Python (psycopg2 or SQLAlchemy + pandas)
-❌Define target variable: loan_status — map "Charged Off" / "Default" to 1, "Fully Paid" to 0, drop everything else (current loans, grace period etc.)
+✅Define target variable: loan_status — map "Charged Off" / "Default" to 1, "Fully Paid" to 0, drop everything else (current loans, grace period etc.)
 
 ---------------------------------------------------------------------
 ❌Phase 2: SQL Cleaning & Feature Engineering
