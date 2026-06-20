@@ -13,26 +13,24 @@
 ✅Define target variable: loan_status — map "Charged Off" / "Default" to 1, "Fully Paid" to 0, drop everything else (current loans, grace period etc.)
 
 ---------------------------------------------------------------------
-❌Phase 2: SQL Cleaning & Feature Engineering
+✅Phase 2: SQL Cleaning & Feature Engineering
 ---------------------------------------------------------------------
 
 Write SQL queries to:
 ✅Drop columns with excessive missing values (>70% null)
 ✅Clean text columns — emp_length is stored as "10+ years", convert to numeric
-❌Compute derived features:
+✅Compute derived features:
 
-debt_to_income ratio
 credit_utilization (revolving balance / revolving limit)
 months_since_earliest_credit_line
 
-❌Segment and explore default rates by loan grade, purpose, home ownership
-❌Create a clean final table model_ready that the Python code will read from
+✅Segment and explore default rates by loan grade, purpose, home ownership
 
 ---------------------------------------------------------------------
 Phase 3: Python Modeling
 ---------------------------------------------------------------------
 
-❌Pull model_ready table into pandas via SQLAlchemy
+❌Pull accepted_loans table into pandas via SQLAlchemy
 ❌Train/test split — split chronologically by issue date, not randomly. Earlier loans train, later loans test.
 ❌WoE encoding — encode categorical variables using Weight of Evidence (use the scorecardpy library)
 

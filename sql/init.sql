@@ -109,6 +109,28 @@ BEGIN
         WHEN emp_length = '10+ years' THEN 10
         WHEN emp_length = '< 1 year' THEN 0
         ELSE NULLIF(REGEXP_REPLACE(emp_length, '[^0-9]', '', 'g'), '')::INTEGER
-      END;
+      END,
+      ADD COLUMN IF NOT EXISTS credit_utilization NUMERIC,
+      ADD COLUMN IF NOT EXISTS months_since_earliest_credit_line INTEGER;
+    
+    UPDATE accepted_loans
+    SET
+      credit_utilization = CASE
+        WHEN NULLIF(total_rev_hi_lim, 0) IS NULL THEN NULL
+        ELSE revol_bal / NULLIF(total_rev_hi_lim, 0)
+      END,
+      months_since_earliest_credit_line = CASE
+        WHEN issue_d IS NULL OR earliest_cr_line IS NULL THEN NULL
+        ELSE (
+          EXTRACT(YEAR FROM age(
+            to_date(issue_d, 'Mon-YYYY'),
+            to_date(earliest_cr_line, 'Mon-YYYY')
+          )) * 12
+          + EXTRACT(MONTH FROM age(
+            to_date(issue_d, 'Mon-YYYY'),
+            to_date(earliest_cr_line, 'Mon-YYYY')
+          ))
+        )::INT
+    END;
   END IF;
 END $$;

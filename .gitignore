@@ -219,3 +219,6 @@ __marimo__/
 
 #RAW DATA
 /data/raw/
+
+#RAW SQL QUERIES
+queries.sql
