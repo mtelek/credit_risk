@@ -4,6 +4,7 @@ from generate_staging_sql import generate_staging_table_sql, read_column_names
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 import pandas as pd
+from environment import load_db_config
 
 def run_init_sql(engine, init_sql_path, accepted_table_name):
 	with engine.connect() as connection:
@@ -108,8 +109,9 @@ def main():
 	csv_path = "/app/data/raw/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv"
 	pipeline_start = perf_counter()
 
+	cfg = load_db_config()
 	engine = create_engine(
-		"postgresql+psycopg2://admin:password@postgres:5432/credit_risk",
+		f"postgresql+psycopg2://{cfg['user']}:{cfg['password']}@{cfg['host']}:{cfg['port']}/{cfg['database']}",
 		poolclass=NullPool,
 	)
 
