@@ -30,7 +30,7 @@ months_since_earliest_credit_line
 Phase 3: Python Modeling
 ---------------------------------------------------------------------
 
-❌Pull accepted_loans table into pandas via SQLAlchemy
+✅Pull accepted_loans table into pandas via SQLAlchemy
 ❌Train/test split — split chronologically by issue date, not randomly. Earlier loans train, later loans test.
 ❌WoE encoding — encode categorical variables using Weight of Evidence (use the scorecardpy library)
 
