@@ -125,7 +125,7 @@ BEGIN
     SET
       credit_utilization = CASE
         WHEN NULLIF(total_rev_hi_lim, 0) IS NULL THEN NULL
-        ELSE revol_bal / NULLIF(total_rev_hi_lim, 0)
+        ELSE ROUND(revol_bal / NULLIF(total_rev_hi_lim, 0), 4)
       END,
       months_since_earliest_credit_line = CASE
         WHEN issue_d IS NULL OR earliest_cr_line IS NULL THEN NULL
