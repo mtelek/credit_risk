@@ -1,6 +1,8 @@
 from pathlib import Path
+from time import perf_counter
 from generate_staging_sql import generate_staging_table_sql, read_column_names
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 import pandas as pd
 
 def run_init_sql(engine, init_sql_path, accepted_table_name):
@@ -44,7 +46,6 @@ def sql_table_to_pd(engine):
 	chunks = pd.read_sql_query(text(query), engine, chunksize=100_000)
 	
 	df = pd.concat(chunks, ignore_index=True)
-	print(df.shape)
 	return (df)   
 
 def staging_table_check(engine, staging_table_name):
@@ -105,23 +106,36 @@ def main():
 	accepted_table_name = "accepted_loans"
 	init_sql_path = "/app/sql/init.sql"
 	csv_path = "/app/data/raw/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv"
+	pipeline_start = perf_counter()
 
-	engine = create_engine("postgresql+psycopg2://admin:password@postgres:5432/credit_risk")
+	engine = create_engine(
+		"postgresql+psycopg2://admin:password@postgres:5432/credit_risk",
+		poolclass=NullPool,
+	)
 
+	step_start = perf_counter()
 	staging_ready, staging_row_count = staging_table_check(engine, staging_table_name)
+	print(f"[timing] staging_table_check: {perf_counter() - step_start:.2f}s")
 	if staging_ready:
 		print(f"{staging_table_name} already exists. Skipping create/load. Current rows: {staging_row_count}")
 
 	#Initialize staging table if not exists
 	else:
+		step_start = perf_counter()
 		init_staging_table(csv_path, staging_table_name, engine)
+		print(f"[timing] init_staging_table: {perf_counter() - step_start:.2f}s")
 
 	# Initialize or refresh accepted_loans transformations before loading to pandas.
+	step_start = perf_counter()
 	run_init_sql(engine, init_sql_path, accepted_table_name)
+	print(f"[timing] run_init_sql: {perf_counter() - step_start:.2f}s")
 	
 	#import accepted_loans table into pandas
+	step_start = perf_counter()
 	df = sql_table_to_pd(engine)
+	print(f"[timing] sql_table_to_pd: {perf_counter() - step_start:.2f}s")
 	print(f"{accepted_table_name} loaded into pandas: {df.shape}")
+	print(f"[timing] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
 if __name__ == "__main__":
 	main()

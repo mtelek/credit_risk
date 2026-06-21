@@ -82,4 +82,4 @@ def generate_staging_table_sql(column_names, table_name):
 		column_defs.append(f"    {col_name} TEXT")
 
 	columns_sql = ",\n".join(column_defs)
-	return f"CREATE TABLE IF NOT EXISTS {table_name} (\n{columns_sql}\n);"
+	return f"CREATE UNLOGGED TABLE IF NOT EXISTS {table_name} (\n{columns_sql}\n);"

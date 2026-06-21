@@ -1,35 +1,37 @@
 /*auto generated raw_loans table with zero entries, to be populated by the data pipeline*/
 CREATE TABLE IF NOT EXISTS accepted_loans (
-    loan_status             TEXT,
+    loan_status             SMALLINT,
     issue_d                 TEXT,
-    id                      TEXT,
-    loan_amnt               TEXT,
-    term                    TEXT,
-    int_rate                TEXT,
-    installment             TEXT,
+    id                      NUMERIC,
+    loan_amnt               NUMERIC,
+    term                    INTEGER,
+    int_rate                NUMERIC,
+    installment             NUMERIC,
     grade                   TEXT,
     sub_grade               TEXT,
-    emp_length              TEXT,
+    emp_length              INTEGER,
     home_ownership          TEXT,
-    annual_inc              TEXT,
+    annual_inc              NUMERIC,
     verification_status     TEXT,
     purpose                 TEXT,
     addr_state              TEXT,
-    dti                     TEXT,
-    fico_range_low          TEXT,
-    fico_range_high         TEXT,
-    delinq_2yrs             TEXT,
-    inq_last_6mths          TEXT,
-    open_acc                TEXT,
-    pub_rec                 TEXT,
-    revol_bal               TEXT,
-    total_rev_hi_lim        TEXT,
-    revol_util              TEXT,
-    total_acc               TEXT,
-    mort_acc                TEXT,
-    pub_rec_bankruptcies     TEXT,
-    tax_liens               TEXT,
-    earliest_cr_line        TEXT
+    dti                     NUMERIC,
+    fico_range_low          NUMERIC,
+    fico_range_high         NUMERIC,
+    delinq_2yrs             NUMERIC,
+    inq_last_6mths          NUMERIC,
+    open_acc                NUMERIC,
+    pub_rec                 NUMERIC,
+    revol_bal               NUMERIC,
+    total_rev_hi_lim        NUMERIC,
+    revol_util              NUMERIC,
+    total_acc               NUMERIC,
+    mort_acc                NUMERIC,
+    pub_rec_bankruptcies     NUMERIC,
+    tax_liens               NUMERIC,
+    earliest_cr_line                    TEXT,
+    credit_utilization                  NUMERIC,
+    months_since_earliest_credit_line   INTEGER
 );
 
 /*Populate accepted_loans from staging table only once, when accepted_loans is empty*/
@@ -44,75 +46,81 @@ BEGIN
       tax_liens, earliest_cr_line
     )
     SELECT
-      loan_status, issue_d, id, loan_amnt, term, int_rate, installment, grade, sub_grade,
-      emp_length, home_ownership, annual_inc, verification_status, purpose, addr_state, dti,
-      fico_range_low, fico_range_high, delinq_2yrs, inq_last_6mths, open_acc, pub_rec,
-      revol_bal, total_rev_hi_lim, revol_util, total_acc, mort_acc, pub_rec_bankruptcies,
-      tax_liens, earliest_cr_line
-    FROM stg_accepted_loans;
-
-    /*Remove rows where 70% or more columns are empty/null*/
-    DELETE FROM accepted_loans a
-    WHERE (
-      SELECT COUNT(*) FILTER (WHERE COALESCE(BTRIM(v), '') = '')
-      FROM jsonb_each_text(to_jsonb(a)) AS t(k, v)
-    )::NUMERIC
-    /
-    (
-      SELECT COUNT(*)
-      FROM jsonb_object_keys(to_jsonb(a))
-    ) >= 0.70;
-    /*Remove not meaningful loan_status status rows*/
-    DELETE FROM accepted_loans
-    WHERE lower(trim(loan_status)) NOT IN ('charged off', 'default', 'fully paid');
-
-    /*Set fully paid to 0, and charged off, defualt to 1*/
-    UPDATE accepted_loans
-    SET loan_status = CASE
-      WHEN lower(trim(loan_status)) = 'fully paid' THEN 0
-      WHEN lower(trim(loan_status)) IN ('charged off', 'default') THEN 1
-      ELSE NULL
-    END;
-
-    /*Delete left over NULL values in loan_status. if any*/
-    DELETE FROM accepted_loans
-    WHERE loan_status IS NULL;
-
-    /*set loan_status type to smallint*/
-    ALTER TABLE accepted_loans
-    ALTER COLUMN loan_status TYPE SMALLINT
-    USING loan_status::SMALLINT;
-
-  /*Change types from text to numeric*/
-    ALTER TABLE accepted_loans
-      ALTER COLUMN id TYPE NUMERIC USING NULLIF(TRIM(id), '')::NUMERIC,
-      ALTER COLUMN loan_amnt TYPE NUMERIC USING NULLIF(TRIM(loan_amnt), '')::NUMERIC,
-      ALTER COLUMN int_rate TYPE NUMERIC USING NULLIF(TRIM(int_rate), '')::NUMERIC,
-      ALTER COLUMN installment TYPE NUMERIC USING NULLIF(TRIM(installment), '')::NUMERIC,
-      ALTER COLUMN annual_inc TYPE NUMERIC USING NULLIF(TRIM(annual_inc), '')::NUMERIC,
-      ALTER COLUMN dti TYPE NUMERIC USING NULLIF(TRIM(dti), '')::NUMERIC,
-      ALTER COLUMN fico_range_low TYPE NUMERIC USING NULLIF(TRIM(fico_range_low), '')::NUMERIC,
-      ALTER COLUMN fico_range_high TYPE NUMERIC USING NULLIF(TRIM(fico_range_high), '')::NUMERIC,
-      ALTER COLUMN delinq_2yrs TYPE NUMERIC USING NULLIF(TRIM(delinq_2yrs), '')::NUMERIC,
-      ALTER COLUMN inq_last_6mths TYPE NUMERIC USING NULLIF(TRIM(inq_last_6mths), '')::NUMERIC,
-      ALTER COLUMN open_acc TYPE NUMERIC USING NULLIF(TRIM(open_acc), '')::NUMERIC,
-      ALTER COLUMN pub_rec TYPE NUMERIC USING NULLIF(TRIM(pub_rec), '')::NUMERIC,
-      ALTER COLUMN revol_bal TYPE NUMERIC USING NULLIF(TRIM(revol_bal), '')::NUMERIC,
-      ALTER COLUMN total_rev_hi_lim TYPE NUMERIC USING NULLIF(TRIM(total_rev_hi_lim), '')::NUMERIC,
-      ALTER COLUMN revol_util TYPE NUMERIC USING NULLIF(TRIM(revol_util), '')::NUMERIC,
-      ALTER COLUMN total_acc TYPE NUMERIC USING NULLIF(TRIM(total_acc), '')::NUMERIC,
-      ALTER COLUMN mort_acc TYPE NUMERIC USING NULLIF(TRIM(mort_acc), '')::NUMERIC,
-      ALTER COLUMN pub_rec_bankruptcies TYPE NUMERIC USING NULLIF(TRIM(pub_rec_bankruptcies), '')::NUMERIC,
-      ALTER COLUMN tax_liens TYPE NUMERIC USING NULLIF(TRIM(tax_liens), '')::NUMERIC,
-      ALTER COLUMN term TYPE INTEGER USING NULLIF(REGEXP_REPLACE(term, '[^0-9]', '', 'g'), '')::INTEGER,
-      ALTER COLUMN emp_length TYPE INTEGER USING CASE
+      CASE
+        WHEN lower(trim(loan_status)) = 'fully paid'                THEN 0
+        WHEN lower(trim(loan_status)) IN ('charged off', 'default') THEN 1
+      END::SMALLINT,
+      issue_d,
+      NULLIF(TRIM(id),                   '')::NUMERIC,
+      NULLIF(TRIM(loan_amnt),            '')::NUMERIC,
+      NULLIF(REGEXP_REPLACE(term,        '[^0-9]', '', 'g'), '')::INTEGER,
+      NULLIF(TRIM(int_rate),             '')::NUMERIC,
+      NULLIF(TRIM(installment),          '')::NUMERIC,
+      grade,
+      sub_grade,
+      CASE
         WHEN emp_length = '10+ years' THEN 10
-        WHEN emp_length = '< 1 year' THEN 0
+        WHEN emp_length = '< 1 year'  THEN 0
         ELSE NULLIF(REGEXP_REPLACE(emp_length, '[^0-9]', '', 'g'), '')::INTEGER
-      END,
-      ADD COLUMN IF NOT EXISTS credit_utilization NUMERIC,
-      ADD COLUMN IF NOT EXISTS months_since_earliest_credit_line INTEGER;
-    
+      END::INTEGER,
+      home_ownership,
+      NULLIF(TRIM(annual_inc),           '')::NUMERIC,
+      verification_status,
+      purpose,
+      addr_state,
+      NULLIF(TRIM(dti),                  '')::NUMERIC,
+      NULLIF(TRIM(fico_range_low),       '')::NUMERIC,
+      NULLIF(TRIM(fico_range_high),      '')::NUMERIC,
+      NULLIF(TRIM(delinq_2yrs),          '')::NUMERIC,
+      NULLIF(TRIM(inq_last_6mths),       '')::NUMERIC,
+      NULLIF(TRIM(open_acc),             '')::NUMERIC,
+      NULLIF(TRIM(pub_rec),              '')::NUMERIC,
+      NULLIF(TRIM(revol_bal),            '')::NUMERIC,
+      NULLIF(TRIM(total_rev_hi_lim),     '')::NUMERIC,
+      NULLIF(TRIM(revol_util),           '')::NUMERIC,
+      NULLIF(TRIM(total_acc),            '')::NUMERIC,
+      NULLIF(TRIM(mort_acc),             '')::NUMERIC,
+      NULLIF(TRIM(pub_rec_bankruptcies), '')::NUMERIC,
+      NULLIF(TRIM(tax_liens),            '')::NUMERIC,
+      earliest_cr_line
+    FROM stg_accepted_loans
+    WHERE lower(trim(loan_status)) IN ('charged off', 'default', 'fully paid');
+
+    /*Remove rows where 70% or more columns are null - IS NULL works on all typed columns*/
+    DELETE FROM accepted_loans
+    WHERE (
+      CASE WHEN loan_status          IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN issue_d              IS NULL OR BTRIM(issue_d) = '' THEN 1 ELSE 0 END +
+      CASE WHEN id                   IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN loan_amnt            IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN term                 IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN int_rate             IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN installment          IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN grade                IS NULL OR BTRIM(grade) = '' THEN 1 ELSE 0 END +
+      CASE WHEN sub_grade            IS NULL OR BTRIM(sub_grade) = '' THEN 1 ELSE 0 END +
+      CASE WHEN emp_length           IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN home_ownership       IS NULL OR BTRIM(home_ownership) = '' THEN 1 ELSE 0 END +
+      CASE WHEN annual_inc           IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN verification_status  IS NULL OR BTRIM(verification_status) = '' THEN 1 ELSE 0 END +
+      CASE WHEN purpose              IS NULL OR BTRIM(purpose) = '' THEN 1 ELSE 0 END +
+      CASE WHEN addr_state           IS NULL OR BTRIM(addr_state) = '' THEN 1 ELSE 0 END +
+      CASE WHEN dti                  IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN fico_range_low       IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN fico_range_high      IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN delinq_2yrs          IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN inq_last_6mths       IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN open_acc             IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN pub_rec              IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN revol_bal            IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN total_rev_hi_lim     IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN revol_util           IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN total_acc            IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN mort_acc             IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN pub_rec_bankruptcies IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN tax_liens            IS NULL THEN 1 ELSE 0 END +
+      CASE WHEN earliest_cr_line     IS NULL OR BTRIM(earliest_cr_line) = '' THEN 1 ELSE 0 END
+    )::NUMERIC / 30 >= 0.70;
+
     UPDATE accepted_loans
     SET
       credit_utilization = CASE
