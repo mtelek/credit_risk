@@ -1,12 +1,12 @@
 from multiprocessing.dummy import connection
 from pathlib import Path
 from time import perf_counter
-
 from generate_staging_sql import generate_staging_table_sql, read_column_names
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 import pandas as pd
 from environment import load_db_config
+import scorecardpy as sc
 
 def run_init_sql(engine, init_sql_path, accepted_table_name):
 	with engine.connect() as connection:
@@ -105,7 +105,7 @@ def init_staging_table(csv_path, staging_table_name, engine):
 	print(f"Loaded {row_count} rows into {staging_table_name}.")
 
 def calc_cutoff_data(engine):
-    cutoff_date = engine.connect().execute(
+	cutoff_date = engine.connect().execute(
 		text("""
 		WITH cutoff AS (
 			SELECT issue_d AS cutoff_date
@@ -120,7 +120,7 @@ def calc_cutoff_data(engine):
 		SELECT cutoff_date FROM cutoff;
 		""")
 	).scalar_one()
-    return cutoff_date
+	return cutoff_date
 
 def create_train_data(engine, cutoff_date):
 	with engine.begin() as connection:
@@ -147,6 +147,24 @@ def create_test_data(engine, cutoff_date):
 			{"cutoff_date": cutoff_date}
 		)
 	print("test_data table created.")
+
+def load_train_and_test_data_in_pd(engine):
+	train = pd.read_sql("SELECT * FROM train_data", engine)
+	test = pd.read_sql("SELECT * FROM test_data", engine)
+	return train, test
+
+def apply_woe(train, test, y):
+    bins = sc.woebin(train, y=y)
+    train_woe = sc.woebin_ply(train, bins)
+    test_woe = sc.woebin_ply(test, bins)
+    
+    y_train = train_woe[y]
+    y_test = test_woe[y]
+    
+    x_train = train_woe.drop(columns=[y])
+    y_train = test_woe.drop(columns=[y])
+    
+    return y_train, x_train, y_test, x_test, bins
 
 def main():
 	staging_table_name = "stg_accepted_loans"
@@ -177,12 +195,6 @@ def main():
 	step_start = perf_counter()
 	run_init_sql(engine, init_sql_path, accepted_table_name)
 	print(f"[timing] run_init_sql: {perf_counter() - step_start:.2f}s")
-	
-	#import accepted_loans table into pandas
-	#step_start = perf_counter()
-	#df = sql_table_to_pd(engine)
-	#print(f"[timing] sql_table_to_pd: {perf_counter() - step_start:.2f}s")
-	#print(f"{accepted_table_name} loaded into pandas: {df.shape}")
 	print(f"[timing] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
 	#Create train_data and test_data tables based on cutoff date
@@ -190,6 +202,13 @@ def main():
 	print(f"Cutoff date: {cutoff_date}")
 	create_train_data(engine, cutoff_date)
 	create_test_data(engine, cutoff_date)
+
+	#Load train and test data into pandas
+	train, test = load_train_and_test_data_in_pd(engine)
+	
+	#Apply WoE to train and test data
+	y = "loan_status"
+	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y)
  
 if __name__ == "__main__":
 	main()
