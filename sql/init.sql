@@ -1,7 +1,7 @@
 /*auto generated raw_loans table with zero entries, to be populated by the data pipeline*/
 CREATE TABLE IF NOT EXISTS accepted_loans (
     loan_status             SMALLINT,
-    issue_d                 TEXT,
+    issue_d                 DATE,
     id                      NUMERIC,
     loan_amnt               NUMERIC,
     term                    INTEGER,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS accepted_loans (
     mort_acc                NUMERIC,
     pub_rec_bankruptcies     NUMERIC,
     tax_liens               NUMERIC,
-    earliest_cr_line                    TEXT,
+    earliest_cr_line                    DATE,
     credit_utilization                  NUMERIC,
     months_since_earliest_credit_line   INTEGER
 );
@@ -50,7 +50,7 @@ BEGIN
         WHEN lower(trim(loan_status)) = 'fully paid'                THEN 0
         WHEN lower(trim(loan_status)) IN ('charged off', 'default') THEN 1
       END::SMALLINT,
-      issue_d,
+      to_date(issue_d, 'Mon-YYYY') AS  issue_d,
       NULLIF(TRIM(id),                   '')::NUMERIC,
       NULLIF(TRIM(loan_amnt),            '')::NUMERIC,
       NULLIF(REGEXP_REPLACE(term,        '[^0-9]', '', 'g'), '')::INTEGER,
@@ -82,7 +82,7 @@ BEGIN
       NULLIF(TRIM(mort_acc),             '')::NUMERIC,
       NULLIF(TRIM(pub_rec_bankruptcies), '')::NUMERIC,
       NULLIF(TRIM(tax_liens),            '')::NUMERIC,
-      earliest_cr_line
+      to_date(earliest_cr_line, 'Mon-YYYY') AS earliest_cr_line
     FROM stg_accepted_loans
     WHERE lower(trim(loan_status)) IN ('charged off', 'default', 'fully paid');
 
@@ -90,7 +90,7 @@ BEGIN
     DELETE FROM accepted_loans
     WHERE (
       CASE WHEN loan_status          IS NULL THEN 1 ELSE 0 END +
-      CASE WHEN issue_d              IS NULL OR BTRIM(issue_d) = '' THEN 1 ELSE 0 END +
+      CASE WHEN issue_d              IS NULL THEN 1 ELSE 0 END +
       CASE WHEN id                   IS NULL THEN 1 ELSE 0 END +
       CASE WHEN loan_amnt            IS NULL THEN 1 ELSE 0 END +
       CASE WHEN term                 IS NULL THEN 1 ELSE 0 END +
@@ -118,7 +118,7 @@ BEGIN
       CASE WHEN mort_acc             IS NULL THEN 1 ELSE 0 END +
       CASE WHEN pub_rec_bankruptcies IS NULL THEN 1 ELSE 0 END +
       CASE WHEN tax_liens            IS NULL THEN 1 ELSE 0 END +
-      CASE WHEN earliest_cr_line     IS NULL OR BTRIM(earliest_cr_line) = '' THEN 1 ELSE 0 END
+      CASE WHEN earliest_cr_line     IS NULL THEN 1 ELSE 0 END
     )::NUMERIC / 30 >= 0.70;
 
     UPDATE accepted_loans
@@ -130,14 +130,9 @@ BEGIN
       months_since_earliest_credit_line = CASE
         WHEN issue_d IS NULL OR earliest_cr_line IS NULL THEN NULL
         ELSE (
-          EXTRACT(YEAR FROM age(
-            to_date(issue_d, 'Mon-YYYY'),
-            to_date(earliest_cr_line, 'Mon-YYYY')
+          EXTRACT(YEAR FROM age( issue_d, earliest_cr_line
           )) * 12
-          + EXTRACT(MONTH FROM age(
-            to_date(issue_d, 'Mon-YYYY'),
-            to_date(earliest_cr_line, 'Mon-YYYY')
-          ))
+          + EXTRACT(MONTH FROM age(issue_d, earliest_cr_line))
         )::INT
     END;
   END IF;

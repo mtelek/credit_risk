@@ -1,5 +1,7 @@
+from multiprocessing.dummy import connection
 from pathlib import Path
 from time import perf_counter
+
 from generate_staging_sql import generate_staging_table_sql, read_column_names
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
@@ -102,6 +104,50 @@ def init_staging_table(csv_path, staging_table_name, engine):
 		row_count = connection.execute(text(f"SELECT COUNT(*) FROM {staging_table_name}")).scalar_one()
 	print(f"Loaded {row_count} rows into {staging_table_name}.")
 
+def calc_cutoff_data(engine):
+    cutoff_date = engine.connect().execute(
+		text("""
+		WITH cutoff AS (
+			SELECT issue_d AS cutoff_date
+			FROM accepted_loans
+			ORDER BY issue_d
+			OFFSET(
+				SELECT FLOOR(COUNT(*) * 0.8)
+				FROM accepted_loans
+			)
+			LIMIT 1
+		)
+		SELECT cutoff_date FROM cutoff;
+		""")
+	).scalar_one()
+    return cutoff_date
+
+def create_train_data(engine, cutoff_date):
+	with engine.begin() as connection:
+		connection.execute(
+			text("""
+			CREATE TABLE IF NOT EXISTS train_data AS
+			SELECT *
+			FROM accepted_loans
+			WHERE issue_d <= :cutoff_date;
+			"""),
+			{"cutoff_date": cutoff_date}
+		)
+	print("train_data table created.")
+ 
+def create_test_data(engine, cutoff_date):
+	with engine.begin() as connection:
+		connection.execute(
+			text("""
+			CREATE TABLE IF NOT EXISTS test_data AS
+			SELECT *
+			FROM accepted_loans
+			WHERE issue_d > :cutoff_date;
+			"""),
+			{"cutoff_date": cutoff_date}
+		)
+	print("test_data table created.")
+
 def main():
 	staging_table_name = "stg_accepted_loans"
 	accepted_table_name = "accepted_loans"
@@ -133,11 +179,17 @@ def main():
 	print(f"[timing] run_init_sql: {perf_counter() - step_start:.2f}s")
 	
 	#import accepted_loans table into pandas
-	step_start = perf_counter()
-	df = sql_table_to_pd(engine)
-	print(f"[timing] sql_table_to_pd: {perf_counter() - step_start:.2f}s")
-	print(f"{accepted_table_name} loaded into pandas: {df.shape}")
+	#step_start = perf_counter()
+	#df = sql_table_to_pd(engine)
+	#print(f"[timing] sql_table_to_pd: {perf_counter() - step_start:.2f}s")
+	#print(f"{accepted_table_name} loaded into pandas: {df.shape}")
 	print(f"[timing] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
+	#Create train_data and test_data tables based on cutoff date
+	cutoff_date = calc_cutoff_data(engine)
+	print(f"Cutoff date: {cutoff_date}")
+	create_train_data(engine, cutoff_date)
+	create_test_data(engine, cutoff_date)
+ 
 if __name__ == "__main__":
 	main()
