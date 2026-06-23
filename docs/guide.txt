@@ -32,14 +32,14 @@ Phase 3: Python Modeling
 
 ✅Pull accepted_loans table into pandas via SQLAlchemy
 ✅Train/test split — split chronologically by issue date, not randomly. Earlier loans train, later loans test.
-❌WoE encoding — encode categorical variables using Weight of Evidence (use the scorecardpy library)
+✅WoE encoding — encode categorical variables using Weight of Evidence (use the scorecardpy library)
 
-❌Logistic Regression first:
+Logistic Regression first:
 ❌Fit with sklearn
 ❌Check coefficients make business sense (higher debt-to-income → higher default probability?)
 ❌Evaluate: ROC-AUC, Gini, KS statistic
 
-❌XGBoost second:
+XGBoost second:
 ❌Fit, tune hyperparameters with cross-validation
 ❌Compare performance vs logistic regression
 ❌Plot feature importance
