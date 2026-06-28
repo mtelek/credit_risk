@@ -7,6 +7,13 @@ from sqlalchemy.pool import NullPool
 import pandas as pd
 from environment import load_db_config
 import scorecardpy as sc
+import warnings
+from sklearn.linear_model import LogisticRegression
+import re
+from sklearn.metrics import roc_auc_score
+from scipy.stats import ks_2samp
+
+warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
 
 def run_init_sql(engine, init_sql_path, accepted_table_name):
 	with engine.connect() as connection:
@@ -153,18 +160,46 @@ def load_train_and_test_data_in_pd(engine):
 	test = pd.read_sql("SELECT * FROM test_data", engine)
 	return train, test
 
+def check_class_balance(df, y, label="dataset"):
+	counts = df[y].value_counts()
+	proportions = df[y].value_counts(normalize=True)
+	print(f"\nClass balance for {label}:")
+	print(counts)
+	print(proportions.round(4))
+
 def apply_woe(train, test, y):
-    bins = sc.woebin(train, y=y)
-    train_woe = sc.woebin_ply(train, bins)
-    test_woe = sc.woebin_ply(test, bins)
-    
-    y_train = train_woe[y]
-    y_test = test_woe[y]
-    
-    x_train = train_woe.drop(columns=[y])
-    y_train = test_woe.drop(columns=[y])
-    
-    return y_train, x_train, y_test, x_test, bins
+	date_cols = ['issue_d', 'earliest_cr_line']
+	train_clean = train.drop(columns=[c for c in date_cols if c in train.columns])
+	test_clean = test.drop(columns=[c for c in date_cols if c in test.columns])
+
+	dt_filtered = sc.var_filter(train_clean, y=y)
+	keep_cols = dt_filtered.columns.tolist()
+
+	bins = sc.woebin(dt_filtered, y=y, check_cate_num=False)
+
+	train_woe = sc.woebin_ply(dt_filtered, bins)
+	test_woe = sc.woebin_ply(test_clean[keep_cols], bins)
+
+	y_train = train_woe[y]
+	y_test = test_woe[y]
+
+	x_train = train_woe.drop(columns=[y])
+	x_test = test_woe.drop(columns=[y])
+
+	return y_train, x_train, y_test, x_test, bins
+
+def evaluate_model(model, x, y, label="dataset"):
+	y_pred_proba = model.predict_proba(x)[:, 1]
+
+	auc = roc_auc_score(y, y_pred_proba)
+	gini = 2 * auc - 1
+	ks = ks_2samp(y_pred_proba[y == 1], y_pred_proba[y == 0]).statistic
+
+	print(f"\n{label} performance:")
+	print(f"  AUC:  {auc:.4f}")
+	print(f"  Gini: {gini:.4f}")
+	print(f"  KS:   {ks:.4f}")
+	return {"auc": auc, "gini": gini, "ks": ks}
 
 def main():
 	staging_table_name = "stg_accepted_loans"
@@ -195,20 +230,76 @@ def main():
 	step_start = perf_counter()
 	run_init_sql(engine, init_sql_path, accepted_table_name)
 	print(f"[timing] run_init_sql: {perf_counter() - step_start:.2f}s")
-	print(f"[timing] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
 	#Create train_data and test_data tables based on cutoff date
+	step_start = perf_counter()
 	cutoff_date = calc_cutoff_data(engine)
 	print(f"Cutoff date: {cutoff_date}")
+	print(f"[timing] calc_cutoff_data: {perf_counter() - step_start:.2f}s")
+
+	step_start = perf_counter()
 	create_train_data(engine, cutoff_date)
+	print(f"[timing] create_train_data: {perf_counter() - step_start:.2f}s")
+
+	step_start = perf_counter()
 	create_test_data(engine, cutoff_date)
+	print(f"[timing] create_test_data: {perf_counter() - step_start:.2f}s")
 
 	#Load train and test data into pandas
+	step_start = perf_counter()
 	train, test = load_train_and_test_data_in_pd(engine)
+	print(f"[timing] load_train_and_test_data_in_pd: {perf_counter() - step_start:.2f}s")
 	
+	#Check imbalance in the datasets
+	check_class_balance(train, "loan_status", label="train")
+	check_class_balance(test, "loan_status", label="test")
+
 	#Apply WoE to train and test data
+	step_start = perf_counter()
 	y = "loan_status"
 	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y)
+	print(f"[timing] apply_woe: {perf_counter() - step_start:.2f}s")
  
+	#Model with Logistic Regression
+	step_start = perf_counter()
+	logreg = LogisticRegression(class_weight='balanced', max_iter=1000)
+	logreg.fit(x_train, y_train)
+	print(f"[timing] logreg.fit: {perf_counter() - step_start:.2f}s")
+ 
+	#Check coefficients make business sense
+	coef_df = pd.DataFrame({
+		'variable': [re.sub('_woe$', '', col) for col in x_train.columns],
+		'coefficient': logreg.coef_[0]
+	}).sort_values('coefficient', ascending=False)
+
+	print(coef_df.to_string(index=False))
+
+	negative_coefs = coef_df[coef_df['coefficient'] < 0]
+	if not negative_coefs.empty:
+		print("\nUnexpected negative coefficients — investigate:")
+		print(negative_coefs.to_string(index=False))
+	else:
+		print("\nAll coefficients positive — consistent with WOE convention.")
+
+
+	key_vars = ['dti', 'annual_inc', 'int_rate']
+	for var in key_vars:
+		if var in bins:
+			print(f"\n{var}:")
+			print(bins[var][['bin', 'count_distr', 'badprob', 'woe']])
+ 
+	#Evaluate model
+	step_start = perf_counter()
+	train_metrics = evaluate_model(logreg, x_train, y_train, label="Train")
+	test_metrics = evaluate_model(logreg, x_test,  y_test,  label="Test")
+	print(f"[timing] evaluate_model (train+test): {perf_counter() - step_start:.2f}s")
+ 
+	auc_gap = train_metrics['auc'] - test_metrics['auc']
+	print(f"\nTrain-Test AUC gap: {auc_gap:.4f}")
+	if auc_gap > 0.05:
+		print("Meaningful gap — investigate possible overfitting.")
+
+	print(f"[timing] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
+
 if __name__ == "__main__":
 	main()

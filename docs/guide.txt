@@ -35,9 +35,9 @@ Phase 3: Python Modeling
 ✅WoE encoding — encode categorical variables using Weight of Evidence (use the scorecardpy library)
 
 Logistic Regression first:
-❌Fit with sklearn
-❌Check coefficients make business sense (higher debt-to-income → higher default probability?)
-❌Evaluate: ROC-AUC, Gini, KS statistic
+✅Fit with sklearn
+✅Check coefficients make business sense (higher debt-to-income → higher default probability?)
+✅Evaluate: ROC-AUC, Gini, KS statistic
 
 XGBoost second:
 ❌Fit, tune hyperparameters with cross-validation
