@@ -19,6 +19,9 @@ clean-data:
 	$(COMPOSE) down -v
 	sudo rm -fr data/
 
+clean-cache:
+	sudo rm -f data/*.pkl
+
 prune-all:
 	$(COMPOSE) down -v --rmi all --remove-orphans
 	docker system prune -a --volumes -f

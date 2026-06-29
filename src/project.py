@@ -12,8 +12,28 @@ from sklearn.linear_model import LogisticRegression
 import re
 from sklearn.metrics import roc_auc_score
 from scipy.stats import ks_2samp
+import pickle
+import numpy as np
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
+BINS_CACHE_PATH = "/app/data/bins_cache.pkl"
+TRAIN_WOE = "/app/data/train_woe.pkl"
+TEST_WOE = "/app/data/test_woe.pkl"
+DEBUG_EDA = True
+
+TRAIN_RAW = "/app/data/train_raw.pkl"
+TEST_RAW = "/app/data/test_raw.pkl"
+
+DTYPE_MAP = {
+	"loan_status": "int8",
+	"term": "int16",
+	"grade": "category",
+	"sub_grade": "category",
+	"home_ownership": "category",
+	"verification_status": "category",
+	"purpose": "category",
+	"addr_state": "category",
+}
 
 def run_init_sql(engine, init_sql_path, accepted_table_name):
 	with engine.connect() as connection:
@@ -112,52 +132,62 @@ def init_staging_table(csv_path, staging_table_name, engine):
 	print(f"Loaded {row_count} rows into {staging_table_name}.")
 
 def calc_cutoff_data(engine):
-	cutoff_date = engine.connect().execute(
+	return pd.read_sql(
 		text("""
-		WITH cutoff AS (
-			SELECT issue_d AS cutoff_date
-			FROM accepted_loans
-			ORDER BY issue_d
-			OFFSET(
-				SELECT FLOOR(COUNT(*) * 0.8)
+			SELECT issue_d
+			FROM (
+				SELECT issue_d,
+					   ROW_NUMBER() OVER (ORDER BY issue_d) AS rn,
+					   COUNT(*) OVER () AS total
 				FROM accepted_loans
-			)
+			) t
+			WHERE rn = FLOOR(total * 0.8)
 			LIMIT 1
-		)
-		SELECT cutoff_date FROM cutoff;
-		""")
-	).scalar_one()
-	return cutoff_date
+		"""),
+		engine
+	).iloc[0, 0]
 
-def create_train_data(engine, cutoff_date):
-	with engine.begin() as connection:
-		connection.execute(
-			text("""
-			CREATE TABLE IF NOT EXISTS train_data AS
-			SELECT *
+def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute=False):
+	if not force_recompute and Path(TRAIN_RAW).exists() and Path(TEST_RAW).exists():
+		train = pd.read_pickle(TRAIN_RAW)
+		test = pd.read_pickle(TEST_RAW)
+		print("Loaded cached train/test data.")
+		return train, test
+
+	feature_cols = ["loan_status", "loan_amnt", "term", "int_rate", "installment", "grade", "sub_grade",
+		"emp_length", "home_ownership", "annual_inc", "verification_status", "purpose",
+		"addr_state", "dti", "fico_range_low", "fico_range_high", "delinq_2yrs",
+		"inq_last_6mths", "open_acc", "pub_rec", "revol_bal", "total_rev_hi_lim",
+		"revol_util", "total_acc", "mort_acc", "pub_rec_bankruptcies", "tax_liens",
+		"credit_utilization", "months_since_earliest_credit_line"]
+	cols =", ".join(feature_cols)
+
+	train = pd.read_sql(
+		text(f"""
+			SELECT {cols}
 			FROM accepted_loans
-			WHERE issue_d <= :cutoff_date;
-			"""),
-			{"cutoff_date": cutoff_date}
-		)
-	print("train_data table created.")
+			WHERE issue_d <= :cutoff
+		"""),
+		engine,
+		params={"cutoff": cutoff_date}
+	)
+	test = pd.read_sql(
+		text(f"""
+			SELECT {cols}
+			FROM accepted_loans
+			WHERE issue_d > :cutoff
+		"""),
+		engine,
+		params={"cutoff": cutoff_date}
+	)
+	
+	# Apply DTYPE optimization
+	train = train.astype({k: v for k, v in DTYPE_MAP.items() if k in train.columns})
+	test = test.astype({k: v for k, v in DTYPE_MAP.items() if k in test.columns})
  
-def create_test_data(engine, cutoff_date):
-	with engine.begin() as connection:
-		connection.execute(
-			text("""
-			CREATE TABLE IF NOT EXISTS test_data AS
-			SELECT *
-			FROM accepted_loans
-			WHERE issue_d > :cutoff_date;
-			"""),
-			{"cutoff_date": cutoff_date}
-		)
-	print("test_data table created.")
-
-def load_train_and_test_data_in_pd(engine):
-	train = pd.read_sql("SELECT * FROM train_data", engine)
-	test = pd.read_sql("SELECT * FROM test_data", engine)
+	train.to_pickle(TRAIN_RAW)
+	test.to_pickle(TEST_RAW)
+	print("Saved train/test cache.")
 	return train, test
 
 def check_class_balance(df, y, label="dataset"):
@@ -167,21 +197,31 @@ def check_class_balance(df, y, label="dataset"):
 	print(counts)
 	print(proportions.round(4))
 
-def apply_woe(train, test, y):
-	date_cols = ['issue_d', 'earliest_cr_line']
-	train_clean = train.drop(columns=[c for c in date_cols if c in train.columns])
-	test_clean = test.drop(columns=[c for c in date_cols if c in test.columns])
+def apply_woe(train, test, y, force_recompute=False):
 
-	dt_filtered = sc.var_filter(train_clean, y=y)
-	keep_cols = dt_filtered.columns.tolist()
+	if not force_recompute and Path(BINS_CACHE_PATH).exists() and Path(TRAIN_WOE).exists() and Path(TEST_WOE).exists():
+		with open(BINS_CACHE_PATH, "rb") as f:
+			bins = pickle.load(f)
 
-	bins = sc.woebin(dt_filtered, y=y, check_cate_num=False)
+		train_woe = pd.read_pickle(TRAIN_WOE)
+		test_woe = pd.read_pickle(TEST_WOE)
 
-	train_woe = sc.woebin_ply(dt_filtered, bins)
-	test_woe = sc.woebin_ply(test_clean[keep_cols], bins)
+		print("Loaded cached WOE + bins.")
+	else:
+		print("Recomputing WOE...")
+		bins = sc.woebin(train, y=y, check_cate_num=False)
+		train_woe = sc.woebin_ply(train, bins)
+		test_woe = sc.woebin_ply(test, bins)
 
-	y_train = train_woe[y]
-	y_test = test_woe[y]
+		with open(BINS_CACHE_PATH, "wb") as f:
+			pickle.dump(bins, f)
+
+		train_woe.to_pickle(TRAIN_WOE)
+		test_woe.to_pickle(TEST_WOE)
+		print("Saved WOE + bins cache.")
+
+	y_train = train_woe[y].astype(int)
+	y_test = test_woe[y].astype(int)
 
 	x_train = train_woe.drop(columns=[y])
 	x_test = test_woe.drop(columns=[y])
@@ -193,7 +233,11 @@ def evaluate_model(model, x, y, label="dataset"):
 
 	auc = roc_auc_score(y, y_pred_proba)
 	gini = 2 * auc - 1
-	ks = ks_2samp(y_pred_proba[y == 1], y_pred_proba[y == 0]).statistic
+
+	y_arr = np.asarray(y)
+	pos = y_pred_proba[y_arr == 1]
+	neg = y_pred_proba[y_arr == 0]
+	ks = ks_2samp(pos, neg).statistic
 
 	print(f"\n{label} performance:")
 	print(f"  AUC:  {auc:.4f}")
@@ -237,19 +281,16 @@ def main():
 	print(f"Cutoff date: {cutoff_date}")
 	print(f"[timing] calc_cutoff_data: {perf_counter() - step_start:.2f}s")
 
-	step_start = perf_counter()
-	create_train_data(engine, cutoff_date)
-	print(f"[timing] create_train_data: {perf_counter() - step_start:.2f}s")
-
-	step_start = perf_counter()
-	create_test_data(engine, cutoff_date)
-	print(f"[timing] create_test_data: {perf_counter() - step_start:.2f}s")
-
 	#Load train and test data into pandas
 	step_start = perf_counter()
-	train, test = load_train_and_test_data_in_pd(engine)
+	train, test = load_train_and_test_data_in_pd(engine, cutoff_date)
 	print(f"[timing] load_train_and_test_data_in_pd: {perf_counter() - step_start:.2f}s")
 	
+ 
+	if DEBUG_EDA:
+		print(train.isna().mean().sort_values(ascending=False))
+		print(train.nunique().sort_values())
+
 	#Check imbalance in the datasets
 	check_class_balance(train, "loan_status", label="train")
 	check_class_balance(test, "loan_status", label="test")
@@ -262,7 +303,7 @@ def main():
  
 	#Model with Logistic Regression
 	step_start = perf_counter()
-	logreg = LogisticRegression(class_weight='balanced', max_iter=1000)
+	logreg = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42)
 	logreg.fit(x_train, y_train)
 	print(f"[timing] logreg.fit: {perf_counter() - step_start:.2f}s")
  
