@@ -14,6 +14,7 @@ from sklearn.metrics import roc_auc_score
 from scipy.stats import ks_2samp
 import pickle
 import numpy as np
+import hashlib
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
 BINS_CACHE_PATH = "/app/data/bins_cache.pkl"
@@ -34,6 +35,10 @@ DTYPE_MAP = {
 	"purpose": "category",
 	"addr_state": "category",
 }
+
+def _cache_key(*parts):
+	raw = "||".join(str(p) for p in parts)
+	return hashlib.md5(raw.encode()).hexdigest()
 
 def run_init_sql(engine, init_sql_path, accepted_table_name):
 	with engine.connect() as connection:
@@ -148,18 +153,21 @@ def calc_cutoff_data(engine):
 	).iloc[0, 0]
 
 def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute=False):
-	if not force_recompute and Path(TRAIN_RAW).exists() and Path(TEST_RAW).exists():
-		train = pd.read_pickle(TRAIN_RAW)
-		test = pd.read_pickle(TEST_RAW)
-		print("Loaded cached train/test data.")
-		return train, test
-
 	feature_cols = ["loan_status", "loan_amnt", "term", "int_rate", "installment", "grade", "sub_grade",
 		"emp_length", "home_ownership", "annual_inc", "verification_status", "purpose",
 		"addr_state", "dti", "fico_range_low", "fico_range_high", "delinq_2yrs",
 		"inq_last_6mths", "open_acc", "pub_rec", "revol_bal", "total_rev_hi_lim",
 		"revol_util", "total_acc", "mort_acc", "pub_rec_bankruptcies", "tax_liens",
 		"credit_utilization", "months_since_earliest_credit_line"]
+	key_path = Path("/app/data/raw_cache.key")
+	cache_key = _cache_key(feature_cols, cutoff_date)
+	
+	if (not force_recompute and Path(TRAIN_RAW).exists() and Path(TEST_RAW).exists() and key_path.exists() and key_path.read_text() == cache_key):
+		train = pd.read_pickle(TRAIN_RAW)
+		test = pd.read_pickle(TEST_RAW)
+		print("Loaded cached train/test data.")
+		return train, test
+
 	cols =", ".join(feature_cols)
 
 	train = pd.read_sql(
@@ -187,6 +195,7 @@ def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute=False):
  
 	train.to_pickle(TRAIN_RAW)
 	test.to_pickle(TEST_RAW)
+	key_path.write_text(cache_key)
 	print("Saved train/test cache.")
 	return train, test
 
@@ -198,8 +207,10 @@ def check_class_balance(df, y, label="dataset"):
 	print(proportions.round(4))
 
 def apply_woe(train, test, y, force_recompute=False):
+	woe_key_path = Path("/app/data/woe_cache.key")
+	woe_key = _cache_key(sorted(train.columns.tolist()), y)
 
-	if not force_recompute and Path(BINS_CACHE_PATH).exists() and Path(TRAIN_WOE).exists() and Path(TEST_WOE).exists():
+	if (not force_recompute and Path(BINS_CACHE_PATH).exists() and Path(TRAIN_WOE).exists() and Path(TEST_WOE).exists() and woe_key_path.exists() and woe_key_path.read_text() == woe_key):
 		with open(BINS_CACHE_PATH, "rb") as f:
 			bins = pickle.load(f)
 
@@ -218,6 +229,7 @@ def apply_woe(train, test, y, force_recompute=False):
 
 		train_woe.to_pickle(TRAIN_WOE)
 		test_woe.to_pickle(TEST_WOE)
+		woe_key_path.write_text(woe_key)
 		print("Saved WOE + bins cache.")
 
 	y_train = train_woe[y].astype(int)
@@ -244,6 +256,53 @@ def evaluate_model(model, x, y, label="dataset"):
 	print(f"  Gini: {gini:.4f}")
 	print(f"  KS:   {ks:.4f}")
 	return {"auc": auc, "gini": gini, "ks": ks}
+
+def log_regression(train, test):
+	#Apply WoE to train and test data
+	step_start = perf_counter()
+	y = "loan_status"
+	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y)
+	print(f"[timing] apply_woe: {perf_counter() - step_start:.2f}s")
+ 
+	#Model with Logistic Regression
+	step_start = perf_counter()
+	logreg = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42)
+	logreg.fit(x_train, y_train)
+	print(f"[timing] logreg.fit: {perf_counter() - step_start:.2f}s")
+ 
+	#Check coefficients make business sense
+	coef_df = pd.DataFrame({
+		'variable': [re.sub('_woe$', '', col) for col in x_train.columns],
+		'coefficient': logreg.coef_[0]
+	}).sort_values('coefficient', ascending=False)
+
+	print(coef_df.to_string(index=False))
+
+	negative_coefs = coef_df[coef_df['coefficient'] < 0]
+	if not negative_coefs.empty:
+		print("\nUnexpected negative coefficients — investigate:")
+		print(negative_coefs.to_string(index=False))
+	else:
+		print("\nAll coefficients positive — consistent with WOE convention.")
+
+
+	key_vars = ['dti', 'annual_inc', 'int_rate']
+	for var in key_vars:
+		if var in bins:
+			print(f"\n{var}:")
+			print(bins[var][['bin', 'count_distr', 'badprob', 'woe']])
+ 
+	#Evaluate model
+	step_start = perf_counter()
+	train_metrics = evaluate_model(logreg, x_train, y_train, label="Train")
+	test_metrics = evaluate_model(logreg, x_test,  y_test,  label="Test")
+	print(f"[timing] evaluate_model (train+test): {perf_counter() - step_start:.2f}s")
+ 
+	auc_gap = train_metrics['auc'] - test_metrics['auc']
+	print(f"\nTrain-Test AUC gap: {auc_gap:.4f}")
+	if auc_gap > 0.05:
+		print("Meaningful gap — investigate possible overfitting.")
+	return logreg, bins, train_metrics, test_metrics
 
 def main():
 	staging_table_name = "stg_accepted_loans"
@@ -295,50 +354,10 @@ def main():
 	check_class_balance(train, "loan_status", label="train")
 	check_class_balance(test, "loan_status", label="test")
 
-	#Apply WoE to train and test data
+	#Logistic regression call
 	step_start = perf_counter()
-	y = "loan_status"
-	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y)
-	print(f"[timing] apply_woe: {perf_counter() - step_start:.2f}s")
- 
-	#Model with Logistic Regression
-	step_start = perf_counter()
-	logreg = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42)
-	logreg.fit(x_train, y_train)
-	print(f"[timing] logreg.fit: {perf_counter() - step_start:.2f}s")
- 
-	#Check coefficients make business sense
-	coef_df = pd.DataFrame({
-		'variable': [re.sub('_woe$', '', col) for col in x_train.columns],
-		'coefficient': logreg.coef_[0]
-	}).sort_values('coefficient', ascending=False)
-
-	print(coef_df.to_string(index=False))
-
-	negative_coefs = coef_df[coef_df['coefficient'] < 0]
-	if not negative_coefs.empty:
-		print("\nUnexpected negative coefficients — investigate:")
-		print(negative_coefs.to_string(index=False))
-	else:
-		print("\nAll coefficients positive — consistent with WOE convention.")
-
-
-	key_vars = ['dti', 'annual_inc', 'int_rate']
-	for var in key_vars:
-		if var in bins:
-			print(f"\n{var}:")
-			print(bins[var][['bin', 'count_distr', 'badprob', 'woe']])
- 
-	#Evaluate model
-	step_start = perf_counter()
-	train_metrics = evaluate_model(logreg, x_train, y_train, label="Train")
-	test_metrics = evaluate_model(logreg, x_test,  y_test,  label="Test")
-	print(f"[timing] evaluate_model (train+test): {perf_counter() - step_start:.2f}s")
- 
-	auc_gap = train_metrics['auc'] - test_metrics['auc']
-	print(f"\nTrain-Test AUC gap: {auc_gap:.4f}")
-	if auc_gap > 0.05:
-		print("Meaningful gap — investigate possible overfitting.")
+	logreg, bins, train_metrics, test_metrics = log_regression(train, test)
+	print(f"[timing] log_regression (total): {perf_counter() - step_start:.2f}s")
 
 	print(f"[timing] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
