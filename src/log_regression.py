@@ -167,4 +167,3 @@ def log_regression(train, test):
 	print(f"\nTrain-Test AUC gap: {auc_gap:.4f}")
 	if auc_gap > 0.05:
 		print("Meaningful gap — investigate possible overfitting.")
-	return logreg, bins, train_metrics, test_metrics
