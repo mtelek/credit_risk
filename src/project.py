@@ -257,6 +257,56 @@ def evaluate_model(model, x, y, label="dataset"):
 	print(f"  KS:   {ks:.4f}")
 	return {"auc": auc, "gini": gini, "ks": ks}
 
+def get_iv_table(bins):
+	iv_table = pd.DataFrame(
+		{
+			"variable": list(bins.keys()),
+			"iv": [b["total_iv"].iloc[0] for b in bins.values()],
+		}
+	).sort_values("iv", ascending=False)
+
+	return iv_table
+
+def variable_check(bins, x_train, x_test, corr_thrshold=0.8, iv_threshold=0.02):
+	iv_table = get_iv_table(bins)
+	print(iv_table)
+
+	keep_vars = iv_table.loc[iv_table.iv >= iv_threshold, "variable"] #print out the variables which werent kept
+	keep_cols = [f"{c}_woe" for c in keep_vars]
+	dropped_low_iv = [c for c in x_train.columns if c not in keep_cols]
+	print(f"Removed {len(dropped_low_iv)} low-IV variables: {dropped_low_iv}")
+
+	x_train = x_train[keep_cols]
+	x_test = x_test[keep_cols]
+
+	corr = x_train.corr().abs()
+	upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
+	
+	to_drop = []
+	for col in upper.columns:
+
+		correlated = upper.index[upper[col] > corr_thrshold].tolist()
+
+		for other in correlated:
+
+			iv_col = iv_table.loc[
+				iv_table.variable == col.replace("_woe", ""),"iv"].iloc[0]
+
+			iv_other = iv_table.loc[
+				iv_table.variable == other.replace("_woe", ""),"iv"].iloc[0]
+
+			if iv_col >= iv_other:
+				to_drop.append(other)
+			else:
+				to_drop.append(col)
+
+	to_drop = list(set(to_drop))
+	x_train = x_train.drop(columns=to_drop)
+	x_test = x_test.drop(columns=to_drop)
+	
+	print(f"Removed {len(to_drop)} highly correlated variables: {to_drop}")
+	return x_train, x_test
+
 def log_regression(train, test):
 	#Apply WoE to train and test data
 	step_start = perf_counter()
@@ -264,6 +314,9 @@ def log_regression(train, test):
 	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y)
 	print(f"[timing] apply_woe: {perf_counter() - step_start:.2f}s")
  
+	#Variable check - IV calculation, remove low IV vars, correlation matrix, remove one var from highly correlated vars
+	x_train, x_test = variable_check(bins, x_train, x_test)
+
 	#Model with Logistic Regression
 	step_start = perf_counter()
 	logreg = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42)
@@ -344,8 +397,7 @@ def main():
 	step_start = perf_counter()
 	train, test = load_train_and_test_data_in_pd(engine, cutoff_date)
 	print(f"[timing] load_train_and_test_data_in_pd: {perf_counter() - step_start:.2f}s")
-	
- 
+
 	if DEBUG_EDA:
 		print(train.isna().mean().sort_values(ascending=False))
 		print(train.nunique().sort_values())
