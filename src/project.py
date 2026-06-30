@@ -15,6 +15,7 @@ from scipy.stats import ks_2samp
 import pickle
 import numpy as np
 import hashlib
+import statsmodels.api as sm
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
 BINS_CACHE_PATH = "/app/data/bins_cache.pkl"
@@ -322,13 +323,16 @@ def log_regression(train, test):
 	logreg = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42)
 	logreg.fit(x_train, y_train)
 	print(f"[timing] logreg.fit: {perf_counter() - step_start:.2f}s")
- 
+
+	x_train_sm = sm.add_constant(x_train)
+	sm_model = sm.Logit(y_train, x_train_sm).fit()
+	print(sm_model.summary())
+
 	#Check coefficients make business sense
 	coef_df = pd.DataFrame({
 		'variable': [re.sub('_woe$', '', col) for col in x_train.columns],
 		'coefficient': logreg.coef_[0]
 	}).sort_values('coefficient', ascending=False)
-
 	print(coef_df.to_string(index=False))
 
 	negative_coefs = coef_df[coef_df['coefficient'] < 0]
