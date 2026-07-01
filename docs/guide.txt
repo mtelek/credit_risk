@@ -40,15 +40,15 @@ Logistic Regression first:
 ✅Evaluate: ROC-AUC, Gini, KS statistic
 
 XGBoost second:
-❌Fit, tune hyperparameters with cross-validation
-❌Compare performance vs logistic regression
-❌Plot feature importance
+✅Fit, tune hyperparameters with cross-validation
+✅Compare performance vs logistic regression
+✅Plot feature importance
 
 ---------------------------------------------------------------------
 Phase 4: Scorecard & Evaluation
 ---------------------------------------------------------------------
 
-❌Convert logistic regression into an actual scorecard using the scorecardpy library — this produces a points table like a real bank scorecard
+✅Convert logistic regression into an actual scorecard using the scorecardpy library — this produces a points table like a real bank scorecard
 ❌Plot the ROC curve comparing logistic regression vs XGBoost
 ❌Compute and plot the KS statistic chart (shows separation between default and non-default score distributions)
 ❌Calibration plot — does the model's predicted probability match actual default rates?
@@ -58,7 +58,7 @@ Phase 4: Scorecard & Evaluation
 ❌Phase 5: Cleanup & Documentation
 ---------------------------------------------------------------------
 
-❌Structure repo cleanly:
+✅Structure repo cleanly:
 credit-risk-scorecard/
 ├── data/           # instructions to download, not the actual data
 ├── sql/            # all .sql scripts

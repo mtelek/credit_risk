@@ -180,4 +180,4 @@ def log_regression(train, test):
 	train_metrics = evaluate_model(logreg, x_train, y_train, label="Train")
 	test_metrics = evaluate_model(logreg, x_test,  y_test,  label="Test")
  
-	return	bins, logreg, x_train, y_train, x_test, y_test
+	return	bins, logreg, x_train, y_train, x_test, y_test, train_metrics, test_metrics
