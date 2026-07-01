@@ -223,3 +223,6 @@ __marimo__/
 
 #RAW SQL QUERIES
 queries.sql
+
+#OUTPUTS
+/outputs

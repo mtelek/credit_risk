@@ -10,6 +10,10 @@ import re
 from dataset_init import _cache_key
 from sklearn.metrics import roc_auc_score
 from scipy.stats import ks_2samp
+from environment import load_db_config
+
+OUTPUTS_DIR = Path("/app/outputs")
+OUTPUTS_DIR.mkdir(exist_ok=True)
 
 BINS_CACHE_PATH = "/app/data/bins_cache.pkl"
 TRAIN_WOE = "/app/data/train_woe.pkl"
@@ -26,9 +30,9 @@ def apply_woe(train, test, y, force_recompute=False):
 		train_woe = pd.read_pickle(TRAIN_WOE)
 		test_woe = pd.read_pickle(TEST_WOE)
 
-		print("Loaded cached WOE + bins.")
+		print("[INFO] Loaded cached WOE + bins.")
 	else:
-		print("Recomputing WOE...")
+		print("[INFO] Recomputing WOE...")
 		bins = sc.woebin(train, y=y, check_cate_num=False)
 		train_woe = sc.woebin_ply(train, bins)
 		test_woe = sc.woebin_ply(test, bins)
@@ -39,7 +43,7 @@ def apply_woe(train, test, y, force_recompute=False):
 		train_woe.to_pickle(TRAIN_WOE)
 		test_woe.to_pickle(TEST_WOE)
 		woe_key_path.write_text(woe_key)
-		print("Saved WOE + bins cache.")
+		print("[INFO] Saved WOE + bins cache.")
 
 	y_train = train_woe[y].astype(int)
 	y_test = test_woe[y].astype(int)
@@ -61,12 +65,12 @@ def get_iv_table(bins):
 
 def variable_check(bins, x_train, x_test, corr_thrshold=0.8, iv_threshold=0.02):
 	iv_table = get_iv_table(bins)
-	print(iv_table)
+	iv_table.to_csv(OUTPUTS_DIR / "iv_table.csv", index=False)
 
-	keep_vars = iv_table.loc[iv_table.iv >= iv_threshold, "variable"] #print out the variables which werent kept
+	keep_vars = iv_table.loc[iv_table.iv >= iv_threshold, "variable"]
 	keep_cols = [f"{c}_woe" for c in keep_vars]
 	dropped_low_iv = [c for c in x_train.columns if c not in keep_cols]
-	print(f"Removed {len(dropped_low_iv)} low-IV variables: {dropped_low_iv}")
+	print(f"[INFO] Removed {len(dropped_low_iv)} low-IV variables: {dropped_low_iv}")
 
 	x_train = x_train[keep_cols]
 	x_test = x_test[keep_cols]
@@ -96,7 +100,7 @@ def variable_check(bins, x_train, x_test, corr_thrshold=0.8, iv_threshold=0.02):
 	x_train = x_train.drop(columns=to_drop)
 	x_test = x_test.drop(columns=to_drop)
 	
-	print(f"Removed {len(to_drop)} highly correlated variables: {to_drop}")
+	print(f"[INFO] Removed {len(to_drop)} highly correlated variables: {to_drop}")
 	return x_train, x_test
 
 def evaluate_model(model, x, y, label="dataset"):
@@ -110,18 +114,32 @@ def evaluate_model(model, x, y, label="dataset"):
 	neg = y_pred_proba[y_arr == 0]
 	ks = ks_2samp(pos, neg).statistic
 
-	print(f"\n{label} performance:")
-	print(f"  AUC:  {auc:.4f}")
-	print(f"  Gini: {gini:.4f}")
-	print(f"  KS:   {ks:.4f}")
-	return {"auc": auc, "gini": gini, "ks": ks}
+	eval_table = pd.DataFrame({
+		"Dataset": [label],
+		"AUC": [auc],
+		"Gini": [gini],
+		"KS": [ks]
+	})
+	return eval_table
+
+def save_coefficients(model, x_train):
+	coef_df = pd.DataFrame({
+		"variable": [re.sub("_woe$", "", col) for col in x_train.columns],
+		"coefficient": model.coef_[0]
+	}).sort_values("coefficient", ascending=False)
+
+	coef_df.to_csv(OUTPUTS_DIR / "logreg_coefficients.csv", index=False)
+
+	return coef_df
 
 def log_regression(train, test):
+	#Loade env variables
+	cfg = load_db_config()
 	#Apply WoE to train and test data
 	step_start = perf_counter()
 	y = "loan_status"
 	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y)
-	print(f"[timing] apply_woe: {perf_counter() - step_start:.2f}s")
+	print(f"[TIMING] apply_woe: {perf_counter() - step_start:.2f}s")
  
 	#Variable check - IV calculation, remove low IV vars, correlation matrix, remove one var from highly correlated vars
 	x_train, x_test = variable_check(bins, x_train, x_test)
@@ -130,40 +148,36 @@ def log_regression(train, test):
 	step_start = perf_counter()
 	logreg = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42)
 	logreg.fit(x_train, y_train)
-	print(f"[timing] logreg.fit: {perf_counter() - step_start:.2f}s")
+	print(f"[TIMING] logreg.fit: {perf_counter() - step_start:.2f}s")
 
+	#Train statsmodels Logit model and export coefficient significance summary (coef + p-values)
 	x_train_sm = sm.add_constant(x_train)
 	sm_model = sm.Logit(y_train, x_train_sm).fit()
-	print(sm_model.summary())
+	summary_df = pd.DataFrame({
+		"coef": sm_model.params,
+		"p_value": sm_model.pvalues,
+	}).sort_values("coef", ascending=False)
+	summary_df.to_csv(OUTPUTS_DIR / "logit_stats.csv")
 
 	#Check coefficients make business sense
-	coef_df = pd.DataFrame({
-		'variable': [re.sub('_woe$', '', col) for col in x_train.columns],
-		'coefficient': logreg.coef_[0]
-	}).sort_values('coefficient', ascending=False)
-	print(coef_df.to_string(index=False))
+	coef_df = save_coefficients(logreg, x_train)
 
-	negative_coefs = coef_df[coef_df['coefficient'] < 0]
-	if not negative_coefs.empty:
-		print("\nUnexpected negative coefficients — investigate:")
-		print(negative_coefs.to_string(index=False))
-	else:
-		print("\nAll coefficients positive — consistent with WOE convention.")
+	if cfg['debug_eda'] == True:
+		negative_coefs = coef_df[coef_df['coefficient'] < 0]
+		if not negative_coefs.empty:
+			print("\n[INFO] Unexpected negative coefficients — investigate:")
+			print(negative_coefs.to_string(index=False))
+		else:
+			print("\n[INFO] All coefficients positive — consistent with WOE convention.")
 
-
-	key_vars = ['dti', 'annual_inc', 'int_rate']
-	for var in key_vars:
-		if var in bins:
-			print(f"\n{var}:")
-			print(bins[var][['bin', 'count_distr', 'badprob', 'woe']])
+		key_vars = ['dti', 'annual_inc', 'int_rate']
+		for var in key_vars:
+			if var in bins:
+				print(f"\n{var}:")
+				print(bins[var][['bin', 'count_distr', 'badprob', 'woe']])
  
 	#Evaluate model
-	step_start = perf_counter()
 	train_metrics = evaluate_model(logreg, x_train, y_train, label="Train")
 	test_metrics = evaluate_model(logreg, x_test,  y_test,  label="Test")
-	print(f"[timing] evaluate_model (train+test): {perf_counter() - step_start:.2f}s")
  
-	auc_gap = train_metrics['auc'] - test_metrics['auc']
-	print(f"\nTrain-Test AUC gap: {auc_gap:.4f}")
-	if auc_gap > 0.05:
-		print("Meaningful gap — investigate possible overfitting.")
+	return	bins, logreg, x_train, y_train, x_test, y_test

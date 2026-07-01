@@ -11,9 +11,11 @@ from generate_staging_sql import generate_staging_table_sql, read_column_names
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
+OUTPUTS_DIR = Path("/app/outputs")
+OUTPUTS_DIR.mkdir(exist_ok=True)
+
 TRAIN_RAW = "/app/data/train_raw.pkl"
 TEST_RAW = "/app/data/test_raw.pkl"
-DEBUG_EDA = True
 
 DTYPE_MAP = {
 	"loan_status": "int8",
@@ -103,13 +105,13 @@ def init_staging_table(csv_path, staging_table_name, engine):
 	#Save SQL to file so it can be executed in Postgres
 	output_path = Path("/app/sql/staging_accepted_loans.sql")
 	output_path.write_text(staging_sql + "\n", encoding="utf-8")
-	print(f"Staging SQL written to: {output_path}")
+	print(f"[INFO] Staging SQL written to: {output_path}")
 
 	#create staging table in Postgres using SQLAlchemy
 	with engine.begin() as connection:
 		connection.execute(text(staging_sql))
 		connection.execute(text(f"TRUNCATE TABLE {staging_table_name}"))
-	print("Staging table created (or already exists).")
+	print("[INFO] Staging table created (or already exists).")
 
 	#Bulk load CSV into staging table
 	copy_sql = f"COPY {staging_table_name} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)"
@@ -124,7 +126,7 @@ def init_staging_table(csv_path, staging_table_name, engine):
 
 	with engine.connect() as connection:
 		row_count = connection.execute(text(f"SELECT COUNT(*) FROM {staging_table_name}")).scalar_one()
-	print(f"Loaded {row_count} rows into {staging_table_name}.")
+	print(f"[INFO] Loaded {row_count} rows into {staging_table_name}.")
 
 def calc_cutoff_data(engine):
 	return pd.read_sql(
@@ -155,7 +157,7 @@ def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute=False):
 	if (not force_recompute and Path(TRAIN_RAW).exists() and Path(TEST_RAW).exists() and key_path.exists() and key_path.read_text() == cache_key):
 		train = pd.read_pickle(TRAIN_RAW)
 		test = pd.read_pickle(TEST_RAW)
-		print("Loaded cached train/test data.")
+		print("[INFO] Loaded cached train/test data.")
 		return train, test
 
 	cols =", ".join(feature_cols)
@@ -186,15 +188,20 @@ def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute=False):
 	train.to_pickle(TRAIN_RAW)
 	test.to_pickle(TEST_RAW)
 	key_path.write_text(cache_key)
-	print("Saved train/test cache.")
+	print("[INFO] Saved train/test cache.")
 	return train, test
 
 def check_class_balance(df, y, label="dataset"):
 	counts = df[y].value_counts()
 	proportions = df[y].value_counts(normalize=True)
-	print(f"\nClass balance for {label}:")
-	print(counts)
-	print(proportions.round(4))
+
+	balance_df = pd.DataFrame({
+		"count": counts,
+		"proportion": proportions
+	})
+
+	balance_df.to_csv(OUTPUTS_DIR / f"{label}_class_balance.csv")
+	print(f"[INFO] {label} class balance saved")
 
 def dataset_init():
 	staging_table_name = "stg_accepted_loans"
@@ -211,33 +218,33 @@ def dataset_init():
 
 	step_start = perf_counter()
 	staging_ready, staging_row_count = staging_table_check(engine, staging_table_name)
-	print(f"[timing] staging_table_check: {perf_counter() - step_start:.2f}s")
+	print(f"[TIMING] staging_table_check: {perf_counter() - step_start:.2f}s")
 	if staging_ready:
-		print(f"{staging_table_name} already exists. Skipping create/load. Current rows: {staging_row_count}")
+		print(f"[INFO] {staging_table_name} already exists. Skipping create/load. Current rows: {staging_row_count}")
 
 	#Initialize staging table if not exists
 	else:
 		step_start = perf_counter()
 		init_staging_table(csv_path, staging_table_name, engine)
-		print(f"[timing] init_staging_table: {perf_counter() - step_start:.2f}s")
+		print(f"[TIMING] init_staging_table: {perf_counter() - step_start:.2f}s")
 
 	# Initialize or refresh accepted_loans transformations before loading to pandas.
 	step_start = perf_counter()
 	run_init_sql(engine, init_sql_path, accepted_table_name)
-	print(f"[timing] run_init_sql: {perf_counter() - step_start:.2f}s")
+	print(f"[TIMING] run_init_sql: {perf_counter() - step_start:.2f}s")
 
 	#Create train_data and test_data tables based on cutoff date
 	step_start = perf_counter()
 	cutoff_date = calc_cutoff_data(engine)
-	print(f"Cutoff date: {cutoff_date}")
-	print(f"[timing] calc_cutoff_data: {perf_counter() - step_start:.2f}s")
+	print(f"[INFO] Cutoff date: {cutoff_date}")
+	print(f"[TIMING] calc_cutoff_data: {perf_counter() - step_start:.2f}s")
 
 	#Load train and test data into pandas
 	step_start = perf_counter()
 	train, test = load_train_and_test_data_in_pd(engine, cutoff_date)
-	print(f"[timing] load_train_and_test_data_in_pd: {perf_counter() - step_start:.2f}s")
+	print(f"[TIMING] load_train_and_test_data_in_pd: {perf_counter() - step_start:.2f}s")
 
-	if DEBUG_EDA:
+	if cfg['debug_eda'] == True:
 		print(train.isna().mean().sort_values(ascending=False))
 		print(train.nunique().sort_values())
 

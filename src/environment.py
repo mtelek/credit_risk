@@ -12,6 +12,7 @@ def load_db_config():
 	db_name = get_env("POSTGRES_DB")
 	db_host = get_env("POSTGRES_HOST", "postgres")
 	db_port = int(get_env("POSTGRES_PORT", "5432"))
+	debug_eda = get_env("DEBUG_EDA", "False").lower() == "true"
 
 	return {
 		"user": db_user,
@@ -19,4 +20,5 @@ def load_db_config():
 		"database": db_name,
 		"host": db_host,
 		"port": db_port,
+		"debug_eda": debug_eda,
 	}
