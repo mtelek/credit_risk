@@ -17,10 +17,12 @@ clean:
 
 clean-data:
 	$(COMPOSE) down -v
-	sudo rm -fr data/
+	sudo rm -fr data/raw
 
 clean-cache:
 	sudo rm -f data/*.pkl
+	sudo rm -f data/*.key
+	sudo rm -fr data/db_dumps/
 
 prune-all:
 	$(COMPOSE) down -v --rmi all --remove-orphans

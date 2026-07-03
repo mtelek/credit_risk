@@ -4,12 +4,12 @@ import numpy as np
 import pickle
 import pandas as pd
 from pathlib import Path
-from multiprocessing.dummy import connection
 from time import perf_counter
 from environment import load_db_config
 from generate_staging_sql import generate_staging_table_sql, read_column_names
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
+import os
 
 OUTPUTS_DIR = Path("/app/outputs")
 OUTPUTS_DIR.mkdir(exist_ok=True)
@@ -31,41 +31,6 @@ DTYPE_MAP = {
 def _cache_key(*parts):
 	raw = "||".join(str(p) for p in parts)
 	return hashlib.md5(raw.encode()).hexdigest()
-
-def run_init_sql(engine, init_sql_path, accepted_table_name):
-	with engine.connect() as connection:
-		accepted_exists = connection.execute(
-			text(
-				"""
-				SELECT EXISTS (
-					SELECT 1
-					FROM information_schema.tables
-					WHERE table_schema = 'public' AND table_name = :table_name
-				)
-				"""
-			),
-			{"table_name": accepted_table_name},
-			).scalar_one()
-		
-		accepted_has_rows = False
-		if accepted_exists:
-			accepted_has_rows = connection.execute(
-				text(f"SELECT EXISTS (SELECT 1 FROM {accepted_table_name} LIMIT 1)")
-			).scalar_one()
-
-	should_run_init = (not accepted_exists) or (not accepted_has_rows)
-	
-	if should_run_init:
-		init_sql = Path(init_sql_path).read_text(encoding="utf-8")
-		raw_connection = engine.raw_connection()
-		try:
-			with raw_connection.cursor() as cursor:
-				cursor.execute(init_sql)
-			raw_connection.commit()
-		finally:
-			raw_connection.close()
-	else:
-		return
 
 def sql_table_to_pd(engine):
 	#import accepted_loans table into pandas
@@ -203,10 +168,61 @@ def check_class_balance(df, y, label="dataset"):
 	balance_df.to_csv(OUTPUTS_DIR / f"{label}_class_balance.csv")
 	print(f"[INFO] {label} class balance saved")
 
+def ensure_schema(engine, schema_sql_path):
+	schema_sql = Path(schema_sql_path).read_text(encoding="utf-8")
+	raw_connection = engine.raw_connection()
+	try:
+		with raw_connection.cursor() as cursor:
+			cursor.execute(schema_sql)
+		raw_connection.commit()
+	finally:
+		raw_connection.close()
+
+def table_has_rows(engine, table_name):
+	with engine.connect() as connection:
+		return connection.execute(
+			text(f"SELECT EXISTS (SELECT 1 FROM {table_name} LIMIT 1)")
+		).scalar_one()
+
+def run_transform_sql(engine, transform_sql_path):
+	transform_sql = Path(transform_sql_path).read_text(encoding="utf-8")
+	raw_connection = engine.raw_connection()
+	try:
+		with raw_connection.cursor() as cursor:
+			cursor.execute(transform_sql)
+		raw_connection.commit()
+	finally:
+		raw_connection.close()
+
+def dump_table_to_csv(engine, table_name, dump_path):
+	Path(dump_path).parent.mkdir(parents=True, exist_ok=True)
+	raw_connection = engine.raw_connection()
+	try:
+		with raw_connection.cursor() as cursor, open(dump_path, "w", encoding="utf-8") as f:
+			cursor.copy_expert(
+				f"COPY {table_name} TO STDOUT WITH (FORMAT csv, HEADER true)", f
+			)
+	finally:
+		raw_connection.close()
+
+def restore_table_from_csv(engine, table_name, dump_path):
+	raw_connection = engine.raw_connection()
+	try:
+		with raw_connection.cursor() as cursor, open(dump_path, "r", encoding="utf-8") as f:
+			cursor.copy_expert(
+				f"COPY {table_name} FROM STDIN WITH (FORMAT csv, HEADER true)", f
+			)
+		raw_connection.commit()
+	finally:
+		raw_connection.close()
+
 def dataset_init():
 	staging_table_name = "stg_accepted_loans"
 	accepted_table_name = "accepted_loans"
-	init_sql_path = "/app/sql/init.sql"
+	schema_sql_path = "/app/sql/schema_accepted_loans.sql"
+	transform_sql_path = "/app/sql/transform_accepted_loans.sql"
+	dump_path = "/app/data/db_dumps/accepted_loans.csv"
+	#init_sql_path = "/app/sql/init.sql"
 	csv_path = "/app/data/raw/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv"
 	pipeline_start = perf_counter()
 
@@ -216,23 +232,37 @@ def dataset_init():
 		poolclass=NullPool,
 	)
 
-	step_start = perf_counter()
-	staging_ready, staging_row_count = staging_table_check(engine, staging_table_name)
-	print(f"[TIMING] staging_table_check: {perf_counter() - step_start:.2f}s")
-	if staging_ready:
-		print(f"[INFO] {staging_table_name} already exists. Skipping create/load. Current rows: {staging_row_count}")
+	ensure_schema(engine, schema_sql_path)
 
-	#Initialize staging table if not exists
+	sql_start = perf_counter()
+	if table_has_rows(engine, accepted_table_name):
+		print(f"[INFO] {accepted_table_name} already populated. Skipping load.")
+	elif os.path.exists(dump_path):
+		step_start = perf_counter()
+		restore_table_from_csv(engine, accepted_table_name, dump_path)
+		print(f"[TIMING] restore_from_dump: {perf_counter() - step_start:.2f}s")
 	else:
 		step_start = perf_counter()
-		init_staging_table(csv_path, staging_table_name, engine)
-		print(f"[TIMING] init_staging_table: {perf_counter() - step_start:.2f}s")
+		staging_ready, staging_row_count = staging_table_check(engine, staging_table_name)
+		print(f"[TIMING] staging_table_check: {perf_counter() - step_start:.2f}s")
+		if staging_ready:
+			print(f"[INFO] {staging_table_name} already exists. Skipping create/load. Current rows: {staging_row_count}")
 
-	# Initialize or refresh accepted_loans transformations before loading to pandas.
-	step_start = perf_counter()
-	run_init_sql(engine, init_sql_path, accepted_table_name)
-	print(f"[TIMING] run_init_sql: {perf_counter() - step_start:.2f}s")
+		#Initialize staging table if not exists
+		else:
+			step_start = perf_counter()
+			init_staging_table(csv_path, staging_table_name, engine)
+			print(f"[TIMING] init_staging_table: {perf_counter() - step_start:.2f}s")
 
+		step_start = perf_counter()
+		run_transform_sql(engine, transform_sql_path)
+		print(f"[TIMING] run_transform_sql: {perf_counter() - step_start:.2f}s")
+
+		step_start = perf_counter()
+		dump_table_to_csv(engine, accepted_table_name, dump_path)
+		print(f"[TIMING] dump_table_to_csv: {perf_counter() - step_start:.2f}s")
+
+	print(f"[TIMING] SQL table init: {perf_counter() - sql_start:.2f}s")
 	#Create train_data and test_data tables based on cutoff date
 	step_start = perf_counter()
 	cutoff_date = calc_cutoff_data(engine)
