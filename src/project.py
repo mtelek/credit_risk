@@ -1,22 +1,51 @@
 from time import perf_counter
 import warnings
 from log_regression import log_regression, OUTPUTS_DIR
-from dataset_init import dataset_init
+from dataset_init import dataset_init, _cache_key
 import scorecardpy as sc
 from xgboost_model import train_xgboost
 import pandas as pd
 import matplotlib.pyplot as plt
 from xgboost import plot_importance
+from pathlib import Path
+import pickle
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
 
-def creating_scorecard_and_scores(bins, logreg, x_train, test):
+SCORECARD_PATH = "/app/data/scorecard.pkl"
+SCORES_PATH = "/app/data/scores.pkl"
+SCORECARD_KEY_PATH = "/app/data/scorecard.key"
+
+def _scorecard_key(bins, logreg, columns):
+	return _cache_key(sorted(columns.tolist()),str(logreg.coef_.round(6).tolist()), str(len(bins)))
+
+def creating_scorecard_and_scores(bins, logreg, x_train, test, force_compute):
+	key = _scorecard_key(bins, logreg, x_train.columns)
+	if (not force_compute and Path(SCORECARD_PATH).exists() and Path(SCORES_PATH).exists() and Path(SCORECARD_KEY_PATH).exists() and Path(SCORECARD_KEY_PATH).read_text() == key):
+		print("[INFO] Loading cached scorecard + scores")
+  
+		with open(SCORECARD_PATH, "rb") as f:
+			card = pickle.load(f)
+		with open(SCORES_PATH, "rb") as f:
+			scores_df = pickle.load(f)
+		return
+
+	print("[INFO] Computing scorecard + scores")
 	card = sc.scorecard(bins, logreg, x_train.columns)
 	card_df = pd.concat(card.values())
 	card_df.to_csv(OUTPUTS_DIR / "scorecard_table.csv", index=False)
 
 	scores_df = sc.scorecard_ply(test, card)
 	scores_df.to_csv(OUTPUTS_DIR / "individual_scores.csv", index=False)
+
+	with open(SCORECARD_PATH, "wb") as f:
+		pickle.dump(card, f)
+
+	with open(SCORES_PATH, "wb") as f:
+		pickle.dump(scores_df, f)
+	
+	Path(SCORECARD_KEY_PATH).write_text(key)
+	print("[INFO] Saved scorecard cache")
 
 def plot_feature_importance(model, x_train, top_n=20, importance_type="gain"):
 	fig, ax = plt.subplots(figsize=(8, max(4, top_n * 0.3)))
@@ -57,7 +86,7 @@ def main():
 
 	#Creating scorecard
 	step_start = perf_counter()
-	creating_scorecard_and_scores(bins, logreg, x_train, test)
+	creating_scorecard_and_scores(bins, logreg, x_train, test, cfg['force_recompute'])
 	print(f"[TIMING] creating scorecards (total): {perf_counter() - step_start:.2f}s")
 
 	#Implementing xgboost for train and test data
