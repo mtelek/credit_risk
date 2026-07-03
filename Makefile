@@ -20,8 +20,8 @@ clean-data:
 	sudo rm -fr data/raw
 
 clean-cache:
-	sudo rm -f data/*.pkl
-	sudo rm -f data/*.key
+	sudo rm -fr data/cache/
+	sudo rm -fr data/key/
 	sudo rm -fr data/db_dumps/
 
 prune-all:

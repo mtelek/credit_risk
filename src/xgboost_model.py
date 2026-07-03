@@ -7,8 +7,8 @@ from pathlib import Path
 import pickle
 from dataset_init import _cache_key
 
-XGB_MODEL_PATH = "/app/data/xgboost_model.pkl"
-XGB_KEY_PATH = "/app/data/xgboost_model.key"
+XGB_MODEL_PATH = "/app/data/cache/xgboost_model.pkl"
+XGB_KEY_PATH = "/app/data/key/xgboost_model.key"
 OUTPUTS_DIR = Path("/app/outputs")
 
 def train_xgboost(x_train, y_train, x_test, y_test, force_recompute, n_iter=30, cv_folds=3, search_sample=200000):

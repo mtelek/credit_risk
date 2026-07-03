@@ -11,11 +11,18 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 import os
 
+CACHE_DIR = Path("/app/data/cache")
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+KEY_DIR = Path("/app/data/key")
+KEY_DIR.mkdir(parents=True, exist_ok=True)
+
 OUTPUTS_DIR = Path("/app/outputs")
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
-TRAIN_RAW = "/app/data/train_raw.pkl"
-TEST_RAW = "/app/data/test_raw.pkl"
+TRAIN_RAW = "/app/data/cache/train_raw.pkl"
+TEST_RAW = "/app/data/cache/test_raw.pkl"
+RAW_KEY_PATH = "/app/data/key/raw_cache.key"
 
 DTYPE_MAP = {
 	"loan_status": "int8",
@@ -116,7 +123,7 @@ def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute):
 		"inq_last_6mths", "open_acc", "pub_rec", "revol_bal", "total_rev_hi_lim",
 		"revol_util", "total_acc", "mort_acc", "pub_rec_bankruptcies", "tax_liens",
 		"credit_utilization", "months_since_earliest_credit_line"]
-	key_path = Path("/app/data/raw_cache.key")
+	key_path = Path(RAW_KEY_PATH)
 	cache_key = _cache_key(feature_cols, cutoff_date)
 	
 	if (not force_recompute and Path(TRAIN_RAW).exists() and Path(TEST_RAW).exists() and key_path.exists() and key_path.read_text() == cache_key):
@@ -222,7 +229,6 @@ def dataset_init():
 	schema_sql_path = "/app/sql/schema_accepted_loans.sql"
 	transform_sql_path = "/app/sql/transform_accepted_loans.sql"
 	dump_path = "/app/data/db_dumps/accepted_loans.csv"
-	#init_sql_path = "/app/sql/init.sql"
 	csv_path = "/app/data/raw/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv"
 	pipeline_start = perf_counter()
 
@@ -262,7 +268,7 @@ def dataset_init():
 		dump_table_to_csv(engine, accepted_table_name, dump_path)
 		print(f"[TIMING] dump_table_to_csv: {perf_counter() - step_start:.2f}s")
 
-	print(f"[TIMING] SQL table init: {perf_counter() - sql_start:.2f}s")
+	print(f"[TIMING] SQL table init (total): {perf_counter() - sql_start:.2f}s")
 	#Create train_data and test_data tables based on cutoff date
 	step_start = perf_counter()
 	cutoff_date = calc_cutoff_data(engine)

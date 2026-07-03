@@ -12,9 +12,9 @@ import pickle
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
 
-SCORECARD_PATH = "/app/data/scorecard.pkl"
-SCORES_PATH = "/app/data/scores.pkl"
-SCORECARD_KEY_PATH = "/app/data/scorecard.key"
+SCORECARD_PATH = "/app/data/cache/scorecard.pkl"
+SCORES_PATH = "/app/data/cache/scores.pkl"
+SCORECARD_KEY_PATH = "/app/data/key/scorecard.key"
 
 def _scorecard_key(bins, logreg, columns):
 	return _cache_key(sorted(columns.tolist()),str(logreg.coef_.round(6).tolist()), str(len(bins)))

@@ -15,12 +15,13 @@ from environment import load_db_config
 OUTPUTS_DIR = Path("/app/outputs")
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
-BINS_CACHE_PATH = "/app/data/bins_cache.pkl"
-TRAIN_WOE = "/app/data/train_woe.pkl"
-TEST_WOE = "/app/data/test_woe.pkl"
+BINS_CACHE_PATH = "/app/data/cache/bins_cache.pkl"
+TRAIN_WOE = "/app/data/cache/train_woe.pkl"
+TEST_WOE = "/app/data/cache/test_woe.pkl"
+WOE_KEY_PATH = "/app/data/keywoe_cache.key"
 
 def apply_woe(train, test, y, force_recompute):
-	woe_key_path = Path("/app/data/woe_cache.key")
+	woe_key_path = Path(WOE_KEY_PATH)
 	woe_key = _cache_key(sorted(train.columns.tolist()), y)
 
 	if (not force_recompute and Path(BINS_CACHE_PATH).exists() and Path(TRAIN_WOE).exists() and Path(TEST_WOE).exists() and woe_key_path.exists() and woe_key_path.read_text() == woe_key):
