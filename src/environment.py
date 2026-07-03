@@ -13,6 +13,7 @@ def load_db_config():
 	db_host = get_env("POSTGRES_HOST", "postgres")
 	db_port = int(get_env("POSTGRES_PORT", "5432"))
 	debug_eda = get_env("DEBUG_EDA", "False").lower() == "true"
+	force_recompute = get_env("FORCE_RECOMPUTE", "False").lower() == "true"
 
 	return {
 		"user": db_user,
@@ -21,4 +22,5 @@ def load_db_config():
 		"host": db_host,
 		"port": db_port,
 		"debug_eda": debug_eda,
+		"force_recompute": force_recompute
 	}

@@ -144,7 +144,7 @@ def calc_cutoff_data(engine):
 		engine
 	).iloc[0, 0]
 
-def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute=False):
+def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute):
 	feature_cols = ["loan_status", "loan_amnt", "term", "int_rate", "installment", "grade", "sub_grade",
 		"emp_length", "home_ownership", "annual_inc", "verification_status", "purpose",
 		"addr_state", "dti", "fico_range_low", "fico_range_high", "delinq_2yrs",
@@ -241,7 +241,7 @@ def dataset_init():
 
 	#Load train and test data into pandas
 	step_start = perf_counter()
-	train, test = load_train_and_test_data_in_pd(engine, cutoff_date)
+	train, test = load_train_and_test_data_in_pd(engine, cutoff_date, cfg['force_recompute'])
 	print(f"[TIMING] load_train_and_test_data_in_pd: {perf_counter() - step_start:.2f}s")
 
 	if cfg['debug_eda'] == True:
@@ -251,4 +251,4 @@ def dataset_init():
 	#Check imbalance in the datasets
 	check_class_balance(train, "loan_status", label="train")
 	check_class_balance(test, "loan_status", label="test")
-	return pipeline_start, train, test
+	return pipeline_start, train, test, cfg

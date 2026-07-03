@@ -11,7 +11,7 @@ XGB_MODEL_PATH = "/app/data/xgboost_model.pkl"
 XGB_KEY_PATH = "/app/data/xgboost_model.key"
 OUTPUTS_DIR = Path("/app/outputs")
 
-def train_xgboost(x_train, y_train, x_test, y_test, n_iter=30, cv_folds=3, search_sample=200000, force_recompute=False):
+def train_xgboost(x_train, y_train, x_test, y_test, force_recompute, n_iter=30, cv_folds=3, search_sample=200000):
 	model_key = _cache_key(sorted(x_train.columns.tolist()), f"xgboost_{n_iter}_{cv_folds}")
     
 	if (not force_recompute and Path(XGB_MODEL_PATH).exists() and Path(XGB_KEY_PATH).exists() and Path(XGB_KEY_PATH).read_text() == model_key):

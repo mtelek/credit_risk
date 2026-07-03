@@ -19,7 +19,7 @@ BINS_CACHE_PATH = "/app/data/bins_cache.pkl"
 TRAIN_WOE = "/app/data/train_woe.pkl"
 TEST_WOE = "/app/data/test_woe.pkl"
 
-def apply_woe(train, test, y, force_recompute=False):
+def apply_woe(train, test, y, force_recompute):
 	woe_key_path = Path("/app/data/woe_cache.key")
 	woe_key = _cache_key(sorted(train.columns.tolist()), y)
 
@@ -138,7 +138,7 @@ def log_regression(train, test):
 	#Apply WoE to train and test data
 	step_start = perf_counter()
 	y = "loan_status"
-	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y)
+	y_train, x_train, y_test, x_test, bins = apply_woe(train, test, y, cfg['force_recompute'])
 	print(f"[TIMING] apply_woe: {perf_counter() - step_start:.2f}s")
  
 	#Variable check - IV calculation, remove low IV vars, correlation matrix, remove one var from highly correlated vars

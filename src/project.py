@@ -48,7 +48,7 @@ def compare_models(log_train_metrics, log_test_metrics, xgb_train_metrics, xgb_t
 
 def main():
 	#Initialize dataset first
-	pipeline_start, train, test = dataset_init()
+	pipeline_start, train, test, cfg = dataset_init()
 
 	#Logistic regression call
 	step_start = perf_counter()
@@ -62,7 +62,7 @@ def main():
 
 	#Implementing xgboost for train and test data
 	step_start = perf_counter()
-	xgb_model, xgb_train_metrics, xgb_test_metrics = train_xgboost(x_train, y_train, x_test, y_test)
+	xgb_model, xgb_train_metrics, xgb_test_metrics = train_xgboost(x_train, y_train, x_test, y_test, cfg['force_recompute'])
 	plot_feature_importance(xgb_model, x_train)
 	print(f"[TIMING] xgboost (total): {perf_counter() - step_start:.2f}s")
 
