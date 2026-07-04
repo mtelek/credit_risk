@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from xgboost import plot_importance
 from pathlib import Path
 import pickle
-from comparison_and_evaluation import plot_roc_curve, plot_decile_ks
+from comparison_and_evaluation import plot_roc_curve, plot_decile_ks, plot_calibration
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
 
@@ -106,10 +106,13 @@ def main():
 	print(f"[TIMING] ROC curve: {perf_counter() - step_start:.2f}s")
 
 	step_start = perf_counter()
-	plot_decile_ks(logreg, x_test, y_test)
-	plot_decile_ks(xgb_model, x_test, y_test)
+	plot_decile_ks(logreg, x_test, y_test, "logreg")
+	plot_decile_ks(xgb_model, x_test, y_test, "xgboost")
 	print(f"[TIMING] decile_ks: {perf_counter() - step_start:.2f}s")
 
+	step_start = perf_counter()
+	plot_calibration(logreg, xgb_model, x_test, y_test, "logreg", "xgboost")
+	print(f"[TIMING] plot calibration for model logreg and xgboost: {perf_counter() - step_start:.2f}s")
 	print(f"[TIMING] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
 if __name__ == "__main__":

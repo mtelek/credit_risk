@@ -3,6 +3,7 @@ from sklearn.metrics import roc_curve, roc_auc_score
 from log_regression import OUTPUTS_DIR
 import pandas as pd
 import numpy as np
+from sklearn.calibration import calibration_curve
 
 def plot_roc_curve(logreg, xgb_model, x_test, y_test):
 	# Predicted probabilities
@@ -31,59 +32,90 @@ def plot_roc_curve(logreg, xgb_model, x_test, y_test):
 	plt.savefig(OUTPUTS_DIR / "roc_comparison.png", dpi=300)
 	plt.close()
 
-def plot_decile_ks(model, x_test, y_test):
-    # Predicted probability of default
-    prob = model.predict_proba(x_test)[:, 1]
+def plot_decile_ks(model, x_test, y_test, model_name):
+	# Predicted probability of default
+	prob = model.predict_proba(x_test)[:, 1]
 
-    # Build DataFrame
-    df = pd.DataFrame({
-        "prob": prob,
-        "target": y_test
-    })
+	# Build DataFrame
+	df = pd.DataFrame({
+		"prob": prob,
+		"target": y_test
+	})
 
-    # Highest PD first (riskiest customers)
-    df = df.sort_values("prob", ascending=False).reset_index(drop=True)
+	# Highest PD first (riskiest customers)
+	df = df.sort_values("prob", ascending=False).reset_index(drop=True)
 
-    # Split into 10 equal-sized groups
-    df["decile"] = pd.qcut(df.index, 10, labels=False) + 1
+	# Split into 10 equal-sized groups
+	df["decile"] = pd.qcut(df.index, 10, labels=False) + 1
 
-    # Calculate goods/bads per decile
-    ks_table = (
-        df.groupby("decile")
-          .agg(
-              bad=("target", "sum"),
-              total=("target", "count")
-          )
-          .reset_index()
-    )
+	# Calculate goods/bads per decile
+	ks_table = (
+		df.groupby("decile")
+		  .agg(
+			  bad=("target", "sum"),
+			  total=("target", "count")
+		  )
+		  .reset_index()
+	)
 
-    ks_table["good"] = ks_table["total"] - ks_table["bad"]
-    # Cumulative percentages
-    ks_table["cum_bad"] = ks_table["bad"].cumsum() / ks_table["bad"].sum()
-    ks_table["cum_good"] = ks_table["good"].cumsum() / ks_table["good"].sum()
-    # KS
-    ks_table["KS"] = np.abs(ks_table["cum_bad"] - ks_table["cum_good"])
+	ks_table["good"] = ks_table["total"] - ks_table["bad"]
+	# Cumulative percentages
+	ks_table["cum_bad"] = ks_table["bad"].cumsum() / ks_table["bad"].sum()
+	ks_table["cum_good"] = ks_table["good"].cumsum() / ks_table["good"].sum()
+	# KS
+	ks_table["KS"] = np.abs(ks_table["cum_bad"] - ks_table["cum_good"])
 
-    # Plot
-    plt.figure(figsize=(8,5))
-    plt.plot(ks_table["decile"], ks_table["cum_bad"], marker="o", label="Bad loans")
-    plt.plot(ks_table["decile"], ks_table["cum_good"], marker="o", label="Good loans")
-    max_idx = ks_table["KS"].idxmax()
+	# Plot
+	plt.figure(figsize=(8,5))
+	plt.plot(ks_table["decile"], ks_table["cum_bad"], marker="o", label="Bad loans")
+	plt.plot(ks_table["decile"], ks_table["cum_good"], marker="o", label="Good loans")
+	max_idx = ks_table["KS"].idxmax()
 
-    plt.vlines(
-        ks_table.loc[max_idx, "decile"],
-        ks_table.loc[max_idx, "cum_good"],
-        ks_table.loc[max_idx, "cum_bad"],
-        colors="red",
-        linestyles="--",
-        label=f"KS = {ks_table.loc[max_idx,'KS']:.3f}"
-    )
+	plt.vlines(
+		ks_table.loc[max_idx, "decile"],
+		ks_table.loc[max_idx, "cum_good"],
+		ks_table.loc[max_idx, "cum_bad"],
+		colors="red",
+		linestyles="--",
+		label=f"KS = {ks_table.loc[max_idx,'KS']:.3f}"
+	)
 
-    plt.xlabel("Risk Decile (1 = Highest PD)")
-    plt.ylabel("Cumulative Percentage")
-    plt.title("KS Decile Chart")
-    plt.grid(alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(OUTPUTS_DIR / "ks_decile_chart.png", dpi=300)
-    plt.close()
+	plt.xlabel("Risk Decile (1 = Highest PD)")
+	plt.ylabel("Cumulative Percentage")
+	plt.title("KS Decile Chart")
+	plt.grid(alpha=0.3)
+	plt.legend()
+	plt.tight_layout()
+	plt.savefig(OUTPUTS_DIR / f"ks_decile_{model_name}.png", dpi=300)
+	plt.close()
+
+def plot_calibration(m_logreg, m_xgboost, x_test, y_test, logreg_name, xgboost_name, n_bins=10):
+	prob_reg = m_logreg.predict_proba(x_test)[:, 1]
+	prob_xgb = m_xgboost.predict_proba(x_test)[:, 1]
+	
+	frac_pos_reg, mean_pred_reg = calibration_curve(
+		y_test,
+		prob_reg,
+		n_bins=n_bins,
+		strategy="quantile"
+	)
+	frac_pos_xgb, mean_pred_xgb = calibration_curve(
+		y_test,
+		prob_xgb,
+		n_bins=n_bins,
+		strategy="quantile"
+	)
+	
+	plt.figure(figsize=(6, 6))
+	plt.plot(mean_pred_reg, frac_pos_reg, marker="o", label=logreg_name)
+	plt.plot(mean_pred_xgb, frac_pos_xgb, marker="o", label=xgboost_name)
+	plt.plot([0, 1], [0, 1], "--", label="Perfect calibration")
+	plt.xlabel("Predicted probability")
+	plt.ylabel("Actual default rate")
+	plt.title("Calibration Plot")
+	plt.legend()
+	plt.grid(alpha=0.3)
+
+	plt.tight_layout()
+	plt.savefig(OUTPUTS_DIR / f"calibration_plot_.png", dpi=300)
+	plt.close()

@@ -50,8 +50,8 @@ Phase 4: Scorecard & Evaluation
 
 ✅Convert logistic regression into an actual scorecard using the scorecardpy library — this produces a points table like a real bank scorecard
 ✅Plot the ROC curve comparing logistic regression vs XGBoost
-❌Compute and plot the KS statistic chart (shows separation between default and non-default score distributions)
-❌Calibration plot — does the model's predicted probability match actual default rates?
+✅Compute and plot the KS statistic chart (shows separation between default and non-default score distributions)
+✅Calibration plot — does the model's predicted probability match actual default rates?
 ❌Write a short interpretation: what are the top 5 most predictive features and why does that make business sense?  
 
 ---------------------------------------------------------------------
