@@ -2,6 +2,21 @@
 
 - This repository implements a credit risk modeling pipeline that builds, evaluates and compares a logistic regression scorecard and an XGBoost model using Lending Club historical data. It includes data ingestion, preprocessing, caching, model training, evaluation (ROC/AUC, KS deciles, calibration) and scorecard generation with per-individual scores.
 
+## Problem
+- The goal of this project is to predict whether a borrower is likely to default on a loan using historical Lending Club data.
+- This is a practical credit risk classification problem that helps support loan approval decisions, portfolio monitoring, and interpretable scorecard development.
+
+## Approach
+- The pipeline loads raw loan data, cleans and transforms it in SQL, and engineers features such as credit utilization and months since the earliest credit line.
+- It uses a temporal train/test split, applies Weight-of-Evidence (WOE) encoding, trains a logistic regression scorecard and an XGBoost model, and compares them using ROC-AUC, Gini, KS, and calibration diagnostics.
+
+## Key findings
+- *Currently Missing*
+
+## Model performance
+- The project reports both discrimination and calibration metrics for the logistic regression and XGBoost models.
+- Metrics include ROC-AUC, Gini, KS statistic, and calibration plots, which are saved in the outputs folder for comparison and review.
+
 ## Quickstart — run the full pipeline
 
 Prerequisites
