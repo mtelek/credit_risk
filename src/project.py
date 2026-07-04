@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from xgboost import plot_importance
 from pathlib import Path
 import pickle
+from comparison_and_evaluation import plot_roc_curve
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="scorecardpy")
 
@@ -99,6 +100,10 @@ def main():
 	step_start = perf_counter()
 	compare_models(log_train_metrics, log_test_metrics, xgb_train_metrics, xgb_test_metrics)
 	print(f"[TIMING] logistic regression and xgboost model comparison (total): {perf_counter() - step_start:.2f}s")
+
+	step_start = perf_counter()
+	plot_roc_curve(logreg, xgb_model, x_test, y_test)
+	print(f"[TIMING] ROC curve: {perf_counter() - step_start:.2f}s")
 
 	print(f"[TIMING] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
