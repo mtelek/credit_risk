@@ -18,7 +18,7 @@ OUTPUTS_DIR.mkdir(exist_ok=True)
 BINS_CACHE_PATH = "/app/data/cache/bins_cache.pkl"
 TRAIN_WOE = "/app/data/cache/train_woe.pkl"
 TEST_WOE = "/app/data/cache/test_woe.pkl"
-WOE_KEY_PATH = "/app/data/keywoe_cache.key"
+WOE_KEY_PATH = "/app/data/key/woe_cache.key"
 
 def apply_woe(train, test, y, force_recompute):
 	woe_key_path = Path(WOE_KEY_PATH)

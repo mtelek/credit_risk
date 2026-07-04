@@ -11,10 +11,10 @@ XGB_MODEL_PATH = "/app/data/cache/xgboost_model.pkl"
 XGB_KEY_PATH = "/app/data/key/xgboost_model.key"
 OUTPUTS_DIR = Path("/app/outputs")
 
-def train_xgboost(x_train, y_train, x_test, y_test, force_recompute, n_iter=30, cv_folds=3, search_sample=200000):
+def train_xgboost(x_train, y_train, x_test, y_test, cfg, n_iter=30, cv_folds=3, search_sample=200000):
 	model_key = _cache_key(sorted(x_train.columns.tolist()), f"xgboost_{n_iter}_{cv_folds}")
     
-	if (not force_recompute and Path(XGB_MODEL_PATH).exists() and Path(XGB_KEY_PATH).exists() and Path(XGB_KEY_PATH).read_text() == model_key):
+	if (not cfg['force_recompute'] and Path(XGB_MODEL_PATH).exists() and Path(XGB_KEY_PATH).exists() and Path(XGB_KEY_PATH).read_text() == model_key):
 		with open(XGB_MODEL_PATH, "rb") as f:
 			model = pickle.load(f)
 		print("[INFO] Loaded cached XGBoost model.")
@@ -47,13 +47,16 @@ def train_xgboost(x_train, y_train, x_test, y_test, force_recompute, n_iter=30, 
 		best_params_df = pd.DataFrame([search.best_params_])
 		best_params_df.to_csv(OUTPUTS_DIR / "xgboost_best_params.csv", index=False)
 
-		print(f"Best CV AUC: {search.best_score_:.4f}")
-		print(f"Best params: {search.best_params_}")
+		if cfg['debug_eda'] == True:
+			print(f"Best CV AUC: {search.best_score_:.4f}")
+			print(f"Best params: {search.best_params_}")
 
 		# Refit best params on FULL training data
 		model = XGBClassifier(**search.best_params_, random_state=42,
 			eval_metric="auc", tree_method="hist")
-		model.fit(x_train, y_train, eval_set=[(x_test, y_test)], verbose=50)
+
+		verbose = 50 if cfg['debug_eda'] else False
+		model.fit(x_train, y_train, eval_set=[(x_test, y_test)], verbose=verbose)
 
 		with open(XGB_MODEL_PATH, "wb") as f:
 			pickle.dump(model, f)

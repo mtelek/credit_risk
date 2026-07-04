@@ -91,7 +91,7 @@ def main():
 
 	#Implementing xgboost for train and test data
 	step_start = perf_counter()
-	xgb_model, xgb_train_metrics, xgb_test_metrics = train_xgboost(x_train, y_train, x_test, y_test, cfg['force_recompute'])
+	xgb_model, xgb_train_metrics, xgb_test_metrics = train_xgboost(x_train, y_train, x_test, y_test, cfg)
 	plot_feature_importance(xgb_model, x_train)
 	print(f"[TIMING] xgboost (total): {perf_counter() - step_start:.2f}s")
 
