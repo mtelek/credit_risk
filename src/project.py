@@ -6,7 +6,7 @@ import scorecardpy as sc
 from xgboost_model import train_xgboost
 import pandas as pd
 import matplotlib.pyplot as plt
-from xgboost import plot_importance
+import numpy as np
 from pathlib import Path
 import pickle
 from comparison_and_evaluation import plot_roc_curve, plot_decile_ks, plot_calibration
@@ -49,11 +49,27 @@ def creating_scorecard_and_scores(bins, logreg, x_train, test, force_compute):
 	print("[INFO] Saved scorecard cache")
 
 def plot_feature_importance(model, x_train, top_n=20, importance_type="gain"):
-	fig, ax = plt.subplots(figsize=(8, max(4, top_n * 0.3)))
-	plot_importance(model, max_num_features=top_n, importance_type=importance_type,
-		ax=ax, height=0.5,)
+	importances = np.asarray(model.feature_importances_, dtype=float)
+	if x_train is not None and len(x_train.columns) == len(importances):
+		feature_names = [str(col).replace("_woe", "") for col in x_train.columns]
+	else:
+		feature_names = [f"feature_{i}" for i in range(len(importances))]
 
-	plt.title(f"XGBoost Feature Importance ({importance_type})")
+	order = np.argsort(importances)[::-1][:top_n]
+	sorted_names = [feature_names[i] for i in order]
+	sorted_importances = importances[order]
+
+	fig, ax = plt.subplots(figsize=(8, max(4, top_n * 0.3)))
+	y_pos = np.arange(len(sorted_names))
+	bars = ax.barh(y_pos, sorted_importances, color="steelblue")
+	ax.set_yticks(y_pos, sorted_names)
+	ax.invert_yaxis()
+	ax.set_xlabel("Importance")
+	ax.set_title(f"XGBoost Feature Importance ({importance_type})")
+
+	for bar, value in zip(bars, sorted_importances):
+		ax.text(value + 0.001, bar.get_y() + bar.get_height() / 2, f"{value:.4f}", va="center", ha="left", fontsize=8)
+
 	plt.tight_layout()
 	fig.savefig(OUTPUTS_DIR / "xgboost_feature_importance.png", dpi=150)
 	plt.close(fig)

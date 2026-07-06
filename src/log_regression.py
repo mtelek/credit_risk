@@ -58,7 +58,7 @@ def get_iv_table(bins):
 	iv_table = pd.DataFrame(
 		{
 			"variable": list(bins.keys()),
-			"iv": [b["total_iv"].iloc[0] for b in bins.values()],
+			"iv": [round(b["total_iv"].iloc[0], 4) for b in bins.values()],
 		}
 	).sort_values("iv", ascending=False)
 
@@ -126,7 +126,7 @@ def evaluate_model(model, x, y, label="dataset"):
 def save_coefficients(model, x_train):
 	coef_df = pd.DataFrame({
 		"variable": [re.sub("_woe$", "", col) for col in x_train.columns],
-		"coefficient": model.coef_[0]
+		"coefficient": np.round(model.coef_[0], 4)
 	}).sort_values("coefficient", ascending=False)
 
 	coef_df.to_csv(OUTPUTS_DIR / "logreg_coefficients.csv", index=False)
@@ -155,8 +155,8 @@ def log_regression(train, test):
 	x_train_sm = sm.add_constant(x_train)
 	sm_model = sm.Logit(y_train, x_train_sm).fit()
 	summary_df = pd.DataFrame({
-		"coef": sm_model.params,
-		"p_value": sm_model.pvalues,
+		"coef": round(sm_model.params, 4),
+		"p_value": sm_model.pvalues.map(lambda x: f"{x:.4e}"),
 	}).sort_values("coef", ascending=False)
 	summary_df.to_csv(OUTPUTS_DIR / "logit_stats.csv")
 

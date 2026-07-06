@@ -169,7 +169,7 @@ def check_class_balance(df, y, label="dataset"):
 
 	balance_df = pd.DataFrame({
 		"count": counts,
-		"proportion": proportions
+		"proportion": round(proportions, 4)
 	})
 
 	balance_df.to_csv(OUTPUTS_DIR / f"{label}_class_balance.csv")
