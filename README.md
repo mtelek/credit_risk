@@ -1,6 +1,6 @@
 # Credit Risk Modeling Project
 
-- This repository implements a credit risk modeling pipeline that builds, evaluates and compares a logistic regression scorecard and an XGBoost model using Lending Club historical data. It includes data ingestion, preprocessing, caching, model training, evaluation (ROC/AUC, KS deciles, calibration) and scorecard generation with per-individual scores.
+- This repository implements a credit risk modeling pipeline that builds, evaluates and compares a logistic regression and an XGBoost model using Lending Club historical data. It includes data ingestion, preprocessing, caching, model training, evaluation (ROC/AUC, KS deciles, calibration) and scorecard generation with per-individual scores.
 
 ## Problem
 - The goal of this project is to predict whether a borrower is likely to default on a loan using historical Lending Club data.
@@ -8,10 +8,12 @@
 
 ## Approach
 - The pipeline loads raw loan data, cleans and transforms it in SQL, and engineers features such as credit utilization and months since the earliest credit line.
-- It uses a temporal train/test split, applies Weight-of-Evidence (WOE) encoding, trains a logistic regression scorecard and an XGBoost model, and compares them using ROC-AUC, Gini, KS, and calibration diagnostics.
+- It uses a temporal train/test split, applies Weight-of-Evidence (WOE) encoding, trains a logistic regression and an XGBoost model, and compares them using ROC-AUC, Gini, KS, and calibration diagnostics.
 
 ## Key findings
-- *Currently Missing*
+- The final model is based on a reduced set of features after filtering out weak predictors. In this run, 13 variables were removed for low IV and 3 more were removed because they were highly correlated with other inputs.
+- The strongest business-relevant drivers of default were loan grade, annual income, home ownership, term, and debt-to-income ratio, all of which align with intuitive credit-risk reasoning.
+- A summary of the best predictors can be found in [docs/top_features_interpretation.md](docs/top_features_interpretation.md)
 
 ## Model performance
 - The project reports both discrimination and calibration metrics for the logistic regression and XGBoost models.
