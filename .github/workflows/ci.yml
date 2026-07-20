@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pipeline-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: credit_risk
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DEBUG_EDA: "False"
+      FORCE_RECOMPUTE: "False"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create local env file
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_HOST=.*/POSTGRES_HOST=localhost/' .env
+          sed -i 's/^POSTGRES_PORT=.*/POSTGRES_PORT=5432/' .env
+          sed -i 's/^FORCE_RECOMPUTE=.*/FORCE_RECOMPUTE=False/' .env
+          sed -i 's/^DEBUG_EDA=.*/DEBUG_EDA=False/' .env
+
+      - name: Build and run pipeline
+        run: |
+          docker compose version
+          docker compose up --build --abort-on-container-exit app
+
+      - name: Verify expected artifacts exist
+        run: |
+          test -f outputs/model_comparison.csv
+          test -f outputs/scorecard_table.csv
+          test -f outputs/individual_scores.csv
+          test -f outputs/roc_comparison.png
+          test -f outputs/ks_decile_logreg.png
+          test -f outputs/ks_decile_xgboost.png
+          test -f outputs/calibration_plot_.png
+          test -f outputs/xgboost_feature_importance.png
+
+      - name: Show artifact summary
+        run: |
+          ls -1 outputs | sort
