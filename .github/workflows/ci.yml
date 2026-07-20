@@ -35,6 +35,8 @@ jobs:
       - name: Build and run pipeline
         run: |
           docker compose version
+          mkdir -p data/raw/accepted_2007_to_2018q4.csv
+          cp tests/fixture_accepted_loans.csv data/raw/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv
           docker compose up -d postgres
           docker compose ps
           for i in $(seq 1 30); do

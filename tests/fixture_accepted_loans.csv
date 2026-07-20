@@ -1,0 +1,6 @@
+loan_status,issue_d,id,loan_amnt,term,int_rate,installment,grade,sub_grade,emp_length,home_ownership,annual_inc,verification_status,purpose,addr_state,dti,fico_range_low,fico_range_high,delinq_2yrs,inq_last_6mths,open_acc,pub_rec,revol_bal,total_rev_hi_lim,revol_util,total_acc,mort_acc,pub_rec_bankruptcies,tax_liens,earliest_cr_line
+Fully Paid,Jan-2018,1,10000,36,10.5,304.17,A, A1,2,MORTGAGE,60000,verified,car,CA,12.5,700,704,0,0,8,0,3000,20000,0.25,20,1,0,0,Jan-2009
+Charged Off,Feb-2018,2,12000,36,13.2,405.33,B, B1,4,RENT,48000,not verified,debt_consolidation,TX,18.2,680,684,1,2,6,0,4500,15000,0.35,15,0,0,0,Feb-2010
+Fully Paid,Mar-2018,3,8000,36,9.8,250.5,A, A2,1,OWN,52000,source verified,home_improvement,NY,10.0,710,714,0,1,10,0,2200,12000,0.18,22,2,0,0,Mar-2010
+Charged Off,Apr-2018,4,15000,60,16.4,349.95,C, C1,6,MORTGAGE,72000,verified,credit_card,FL,22.8,650,654,2,3,7,1,6200,18000,0.48,18,1,1,0,Apr-2008
+Fully Paid,May-2018,5,11000,36,11.1,330.0,A, A3,3,RENT,65000,not verified,major_purchase,IL,14.1,690,694,0,0,9,0,2800,14000,0.2,21,0,0,0,May-2011
