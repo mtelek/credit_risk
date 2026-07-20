@@ -145,6 +145,18 @@ def log_regression(train, test):
 	#Variable check - IV calculation, remove low IV vars, correlation matrix, remove one var from highly correlated vars
 	x_train, x_test = variable_check(bins, x_train, x_test)
 
+	if x_train.shape[1] == 0 or x_train.shape[0] < 5:
+		print("[INFO] Insufficient feature matrix for model fitting; skipping logistic regression training.")
+		empty_metrics = pd.DataFrame({
+			"Dataset": ["Train", "Test"],
+			"AUC": [np.nan, np.nan],
+			"Gini": [np.nan, np.nan],
+			"KS": [np.nan, np.nan],
+		})
+		(OUTPUTS_DIR / "logit_stats.csv").write_text("")
+		(OUTPUTS_DIR / "logreg_coefficients.csv").write_text("")
+		return bins, None, x_train, y_train, x_test, y_test, empty_metrics.iloc[[0]], empty_metrics.iloc[[1]]
+
 	#Model with Logistic Regression
 	step_start = perf_counter()
 	logreg = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42)

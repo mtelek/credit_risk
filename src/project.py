@@ -21,6 +21,12 @@ def _scorecard_key(bins, logreg, columns):
 	return _cache_key(sorted(columns.tolist()),str(logreg.coef_.round(6).tolist()), str(len(bins)))
 
 def creating_scorecard_and_scores(bins, logreg, x_train, test, force_compute):
+	if logreg is None:
+		print("[INFO] Skipping scorecard creation because no model was fitted.")
+		(OUTPUTS_DIR / "scorecard_table.csv").write_text("")
+		(OUTPUTS_DIR / "individual_scores.csv").write_text("")
+		return
+
 	key = _scorecard_key(bins, logreg, x_train.columns)
 	if (not force_compute and Path(SCORECARD_PATH).exists() and Path(SCORES_PATH).exists() and Path(SCORECARD_KEY_PATH).exists() and Path(SCORECARD_KEY_PATH).read_text() == key):
 		print("[INFO] Loading cached scorecard + scores")
@@ -108,8 +114,14 @@ def main():
 
 	#Implementing xgboost for train and test data
 	step_start = perf_counter()
-	xgb_model, xgb_train_metrics, xgb_test_metrics = train_xgboost(x_train, y_train, x_test, y_test, cfg)
-	plot_feature_importance(xgb_model, x_train)
+	if logreg is None:
+		xgb_model = None
+		xgb_train_metrics = pd.DataFrame({"Dataset": ["Train"], "AUC": [np.nan], "Gini": [np.nan], "KS": [np.nan]})
+		xgb_test_metrics = pd.DataFrame({"Dataset": ["Test"], "AUC": [np.nan], "Gini": [np.nan], "KS": [np.nan]})
+		print("[INFO] Skipping XGBoost training because the logistic regression model was not fitted.")
+	else:
+		xgb_model, xgb_train_metrics, xgb_test_metrics = train_xgboost(x_train, y_train, x_test, y_test, cfg)
+		plot_feature_importance(xgb_model, x_train)
 	print(f"[TIMING] xgboost (total): {perf_counter() - step_start:.2f}s")
 
 	# Compare logistic regressions and xgboost model
@@ -118,16 +130,25 @@ def main():
 	print(f"[TIMING] logistic regression and xgboost model comparison (total): {perf_counter() - step_start:.2f}s")
 
 	step_start = perf_counter()
-	plot_roc_curve(logreg, xgb_model, x_test, y_test)
+	if logreg is None:
+		print("[INFO] Skipping ROC/KS/calibration plots because no fitted model is available.")
+	else:
+		plot_roc_curve(logreg, xgb_model, x_test, y_test)
 	print(f"[TIMING] ROC curve: {perf_counter() - step_start:.2f}s")
 
 	step_start = perf_counter()
-	plot_decile_ks(logreg, x_test, y_test, "logreg")
-	plot_decile_ks(xgb_model, x_test, y_test, "xgboost")
+	if logreg is None:
+		print("[INFO] Skipping KS plots because no fitted model is available.")
+	else:
+		plot_decile_ks(logreg, x_test, y_test, "logreg")
+		plot_decile_ks(xgb_model, x_test, y_test, "xgboost")
 	print(f"[TIMING] decile_ks: {perf_counter() - step_start:.2f}s")
 
 	step_start = perf_counter()
-	plot_calibration(logreg, xgb_model, x_test, y_test, "logreg", "xgboost")
+	if logreg is None:
+		print("[INFO] Skipping calibration plots because no fitted model is available.")
+	else:
+		plot_calibration(logreg, xgb_model, x_test, y_test, "logreg", "xgboost")
 	print(f"[TIMING] plot calibration for model logreg and xgboost: {perf_counter() - step_start:.2f}s")
 	print(f"[TIMING] total_pipeline: {perf_counter() - pipeline_start:.2f}s")
 
