@@ -27,7 +27,7 @@ jobs:
       - name: Create local env file
         run: |
           cp .env.example .env
-          sed -i 's/^POSTGRES_HOST=.*/POSTGRES_HOST=localhost/' .env
+          sed -i 's/^POSTGRES_HOST=.*/POSTGRES_HOST=postgres/' .env
           sed -i 's/^POSTGRES_PORT=.*/POSTGRES_PORT=5432/' .env
           sed -i 's/^FORCE_RECOMPUTE=.*/FORCE_RECOMPUTE=False/' .env
           sed -i 's/^DEBUG_EDA=.*/DEBUG_EDA=False/' .env
@@ -35,6 +35,14 @@ jobs:
       - name: Build and run pipeline
         run: |
           docker compose version
+          docker compose up -d postgres
+          docker compose ps
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U admin -d credit_risk; then
+              break
+            fi
+            sleep 2
+          done
           docker compose up --build --abort-on-container-exit app
 
       - name: Verify expected artifacts exist
