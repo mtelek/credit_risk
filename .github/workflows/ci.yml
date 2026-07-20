@@ -49,9 +49,12 @@ jobs:
 
       - name: Verify expected artifacts exist
         run: |
+          test -f outputs/iv_table.csv
+          test -f outputs/train_class_balance.csv
+          test -f outputs/test_class_balance.csv
+          test -f outputs/logit_stats.csv
+          test -f outputs/logreg_coefficients.csv
           test -f outputs/model_comparison.csv
-          test -f outputs/scorecard_table.csv
-          test -f outputs/individual_scores.csv
           test -f outputs/roc_comparison.png
           test -f outputs/ks_decile_logreg.png
           test -f outputs/ks_decile_xgboost.png
