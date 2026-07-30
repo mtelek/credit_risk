@@ -117,7 +117,7 @@ def calc_cutoff_data(engine):
 	).iloc[0, 0]
 
 def load_train_and_test_data_in_pd(engine, cutoff_date, force_recompute):
-	feature_cols = ["loan_status", "loan_amnt", "term", "int_rate", "installment", "grade", "sub_grade",
+	feature_cols = ["loan_status", "id", "loan_amnt", "term", "int_rate", "installment", "grade", "sub_grade",
 		"emp_length", "home_ownership", "annual_inc", "verification_status", "purpose",
 		"addr_state", "dti", "fico_range_low", "fico_range_high", "delinq_2yrs",
 		"inq_last_6mths", "open_acc", "pub_rec", "revol_bal", "total_rev_hi_lim",

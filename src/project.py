@@ -20,6 +20,21 @@ SCORECARD_KEY_PATH = "/app/data/key/scorecard.key"
 def _scorecard_key(bins, logreg, columns):
 	return _cache_key(sorted(columns.tolist()),str(logreg.coef_.round(6).tolist()), str(len(bins)))
 
+def _save_individual_scores(test, scores_df):
+	output_df = test.reset_index(drop=True).copy()
+	if "id" in output_df.columns and "loan_id" not in output_df.columns:
+		output_df = output_df.rename(columns={"id": "loan_id"})
+
+	output_cols = ["loan_id", "grade", "dti", "annual_inc", "loan_status"]
+	output_cols = [c for c in output_cols if c in output_df.columns]
+	output_df = output_df[output_cols].copy()
+	output_df["score"] = scores_df["score"].reset_index(drop=True)
+
+	if "loan_id" in output_df.columns:
+		output_df["loan_id"] = output_df["loan_id"].astype("Int64")
+
+	output_df.to_csv(OUTPUTS_DIR / "individual_scores.csv", index=False)
+
 def creating_scorecard_and_scores(bins, logreg, x_train, test, force_compute):
 	if logreg is None:
 		print("[INFO] Skipping scorecard creation because no model was fitted.")
@@ -35,6 +50,7 @@ def creating_scorecard_and_scores(bins, logreg, x_train, test, force_compute):
 			card = pickle.load(f)
 		with open(SCORES_PATH, "rb") as f:
 			scores_df = pickle.load(f)
+		_save_individual_scores(test, scores_df)
 		return
 
 	print("[INFO] Computing scorecard + scores")
@@ -43,7 +59,7 @@ def creating_scorecard_and_scores(bins, logreg, x_train, test, force_compute):
 	card_df.to_csv(OUTPUTS_DIR / "scorecard_table.csv", index=False)
 
 	scores_df = sc.scorecard_ply(test, card)
-	scores_df.to_csv(OUTPUTS_DIR / "individual_scores.csv", index=False)
+	_save_individual_scores(test, scores_df)
 
 	with open(SCORECARD_PATH, "wb") as f:
 		pickle.dump(card, f)

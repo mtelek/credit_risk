@@ -21,8 +21,12 @@ TEST_WOE = "/app/data/cache/test_woe.pkl"
 WOE_KEY_PATH = "/app/data/key/woe_cache.key"
 
 def apply_woe(train, test, y, force_recompute):
+	exclude_cols = [c for c in ["id", "loan_id"] if c in train.columns]
+	train_features = train.drop(columns=exclude_cols)
+	test_features = test.drop(columns=exclude_cols)
+
 	woe_key_path = Path(WOE_KEY_PATH)
-	woe_key = _cache_key(sorted(train.columns.tolist()), y)
+	woe_key = _cache_key(sorted(train_features.columns.tolist()), y)
 
 	if (not force_recompute and Path(BINS_CACHE_PATH).exists() and Path(TRAIN_WOE).exists() and Path(TEST_WOE).exists() and woe_key_path.exists() and woe_key_path.read_text() == woe_key):
 		with open(BINS_CACHE_PATH, "rb") as f:
@@ -34,9 +38,9 @@ def apply_woe(train, test, y, force_recompute):
 		print("[INFO] Loaded cached WOE + bins.")
 	else:
 		print("[INFO] Recomputing WOE...")
-		bins = sc.woebin(train, y=y, check_cate_num=False)
-		train_woe = sc.woebin_ply(train, bins)
-		test_woe = sc.woebin_ply(test, bins)
+		bins = sc.woebin(train_features, y=y, check_cate_num=False)
+		train_woe = sc.woebin_ply(train_features, bins)
+		test_woe = sc.woebin_ply(test_features, bins)
 
 		with open(BINS_CACHE_PATH, "wb") as f:
 			pickle.dump(bins, f)
