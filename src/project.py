@@ -76,6 +76,12 @@ def plot_feature_importance(model, x_train, top_n=20, importance_type="gain"):
 	for bar, value in zip(bars, sorted_importances):
 		ax.text(value + 0.001, bar.get_y() + bar.get_height() / 2, f"{value:.4f}", va="center", ha="left", fontsize=8)
 
+	importance_df = pd.DataFrame({
+		"variable": feature_names,
+		"importance": np.round(sorted_importances, 4)
+	}).sort_values("importance", ascending=False)
+	importance_df.to_csv(OUTPUTS_DIR / "xgboost_feature_importance.csv", index=False)
+
 	plt.tight_layout()
 	fig.savefig(OUTPUTS_DIR / "xgboost_feature_importance.png", dpi=150)
 	plt.close(fig)
