@@ -19,6 +19,32 @@
 - The project reports both discrimination and calibration metrics for the logistic regression and XGBoost models.
 - Metrics include ROC-AUC, Gini, KS statistic, and calibration plots, which are saved in the outputs folder for comparison and review.
 
+## Loan Default Risk Dashboard (Power BI)
+- This project also includes an interactive Power BI dashboard for analyzing loan default risk and evaluating predictive credit scoring models.
+- The dashboard combines portfolio-level metrics, model performance, feature importance, and scorecard analysis to provide insights into the factors influencing loan defaults and the effectiveness of different machine learning models.
+
+### Dashboard highlights
+- Portfolio overview with total loans, average loan amount, average interest rate, and overall default rate.
+- Default rate analysis across loan grades and monthly loan distribution.
+- Performance comparison between Logistic Regression and XGBoost using AUC, Gini, and KS statistics.
+- Feature importance analysis using Information Value (IV) and XGBoost importance scores.
+- Credit scorecard displaying point allocations for key borrower characteristics.
+- Distribution of credit scores by loan grade and loan repayment status.
+
+### Key insights
+- Higher loan grades (A–B) exhibit substantially lower default rates than lower grades (E–G).
+- XGBoost achieved slightly better predictive performance than Logistic Regression across the evaluated metrics.
+- Loan grade, interest rate, loan term, and FICO score are the strongest predictors of default risk.
+- The scorecard provides an interpretable method for assigning credit scores based on borrower attributes, supporting risk assessment and lending decisions.
+
+### Technologies used
+- Power BI
+- Power Query
+- DAX
+- Logistic Regression
+- XGBoost
+- Credit Scorecard Modeling
+
 ## Quickstart — run the full pipeline
 
 Prerequisites
